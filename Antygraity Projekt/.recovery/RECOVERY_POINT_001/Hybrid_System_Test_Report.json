@@ -1,0 +1,27 @@
+{
+  "test_suite": "Bio-Swarm + CSA Hybrid",
+  "timestamp": "Mon Dec 15 22:08:14 2025",
+  "results": {
+    "semantic_preservation": {
+      "accuracy": 1.0,
+      "status": "PASS"
+    },
+    "performance": {
+      "timings": {
+        "agents_5": 9.729100042022765,
+        "agents_10": 20.82400000654161,
+        "agents_30": 54.34699996840209,
+        "agents_50": 94.52050004620105
+      },
+      "status": "PASS"
+    },
+    "chaos_dynamics": {
+      "active_neurons": 6,
+      "status": "PASS"
+    }
+  },
+  "comparison": {
+    "hybrid_vs_baseline": "Hybrid maintains category; Baseline (Run1) lost it.",
+    "status": "PASS"
+  }
+}

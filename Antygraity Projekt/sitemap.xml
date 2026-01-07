@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vis-Sol | Nowoczesne Rozwiązania Cyfrowe</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        :root { --vs-primary: #00ff88; --vs-dark: #0f172a; --vs-card: #1e293b; }
+        body { background-color: var(--vs-dark); color: white; font-family: 'Inter', sans-serif; }
+
+        .navbar { background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(10px); }
+        .hero-section { padding: 150px 0 100px; background: radial-gradient(circle at top right, #1e293b, #0f172a); }
+
+        .feature-card {
+            background: var(--vs-card);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 30px;
+            transition: 0.3s;
+        }
+        .feature-card:hover { border-color: var(--vs-primary); transform: translateY(-5px); }
+
+        .btn-vs { background-color: var(--vs-primary); color: var(--vs-dark); font-weight: bold; border-radius: 8px; padding: 12px 30px; }
+        .text-gradient { background: linear-gradient(90deg, #00ff88, #60efff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+        footer { border-top: 1px solid rgba(255,255,255,0.1); padding: 40px 0; }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="#">VIS-SOL</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="#o-nas">O nas</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#projekty">Realizacje</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#kontakt">Kontakt</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <header class="hero-section text-center">
+        <div class="container">
+            <h1 class="display-3 fw-bold mb-3">Projektujemy <span class="text-gradient">Sukces w Sieci</span></h1>
+            <p class="lead opacity-75 mb-5">Tworzymy responsywne strony internetowe dopasowane do Twojego biznesu.</p>
+            <a href="#projekty" class="btn btn-vs shadow-lg">ZOBACZ NASZE PRACE</a>
+        </div>
+    </header>
+
+    <section id="o-nas" class="py-5">
+        <div class="container">
+            <div class="row g-4 text-center">
+                <div class="col-md-4">
+                    <div class="feature-card">
+                        <i class="bi bi-code-slash fs-1 text-success mb-3"></i>
+                        <h3>Czysty Kod</h3>
+                        <p class="opacity-75">Nasze strony są zoptymalizowane pod kątem szybkości i wyszukiwarek Google.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="feature-card">
+                        <i class="bi bi-phone fs-1 text-success mb-3"></i>
+                        <h3>Responsywność</h3>
+                        <p class="opacity-75">Strona wygląda świetnie na każdym urządzeniu – od smartfona po komputer.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="feature-card">
+                        <i class="bi bi-envelope-check fs-1 text-success mb-3"></i>
+                        <h3>Wsparcie</h3>
+                        <p class="opacity-75">Pomagamy w konfiguracji formularzy, SEO i obecności w Google Maps.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="projekty" class="py-5">
+        <div class="container">
+            <h2 class="text-center mb-5">Nasze Realizacje</h2>
+            <div class="row justify-content-center">
+                <div class="col-lg-6">
+                    <div class="feature-card">
+                        <img src="https://thumbs.dreamstime.com/b/professional-cleaning-service-worker-power-washing-cobblestone-driveway-high-pressure-washer-352205842.jpg" class="img-fluid rounded mb-3" alt="Projekt MP Bruk&Clean">
+                        <h3>MP Bruk&Clean</h3>
+                        <p class="opacity-75">Strona wizytówka z systemem automatycznych powiadomień e-mail i pełnym SEO lokalnym.</p>
+                        <a href="https://mpbrukclean.prv.pl/" target="_blank" class="text-success text-decoration-none fw-bold">Zobacz stronę online →</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="kontakt" class="py-5 text-center">
+        <div class="container">
+            <div class="feature-card d-inline-block px-5">
+                <h2 class="mb-4">Masz projekt w głowie?</h2>
+                <p class="lead mb-4">Skontaktuj się z Vis-Sol i zacznijmy działać.</p>
+                <a href="mailto:kontakt@vis-sol.prv.pl" class="btn btn-outline-light btn-lg">NAPISZ DO NAS</a>
+            </div>
+        </div>
+    </section>
+
+    <footer class="text-center">
+        <div class="container">
+            <p class="opacity-50">© 2025 Vis-Sol – Nowoczesne Rozwiązania Cyfrowe</p>
+            <p class="small opacity-50">Strona hostowana na: <a href="http://vis-sol.prv.pl" class="text-white">vis-sol.prv.pl</a></p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

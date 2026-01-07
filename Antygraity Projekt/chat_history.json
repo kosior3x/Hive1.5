@@ -1,0 +1,1248 @@
+[
+  {
+    "title": "Nowy czat",
+    "messages": []
+  },
+  {
+    "title": "jak ci mija dzień",
+    "messages": [
+      {
+        "role": "user",
+        "text": "jak ci mija dzień"
+      },
+      {
+        "role": "assistant",
+        "text": "Można mnie nazwać Antygrawitacją - hybrydowym rojem neuronalnym.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.97 | Chaos: 0.548"
+      },
+      {
+        "role": "user",
+        "text": "Ja jestem Kamil"
+      },
+      {
+        "role": "assistant",
+        "text": "Witaj Kamil! Miło mi Cię poznać.\n💾 Zapamiętałem: Imie: Kamil\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.98 | Chaos: 0.536"
+      },
+      {
+        "role": "user",
+        "text": "Co dziś robimy :)"
+      },
+      {
+        "role": "assistant",
+        "text": "Możemy rozmawiać o czymkolwiek - jestem ciekawy Twoich myśli.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.98 | Chaos: 0.446"
+      },
+      {
+        "role": "user",
+        "text": "Ja jade na rower"
+      },
+      {
+        "role": "assistant",
+        "text": "Jasne, słucham.\n🌌 Rezonans wektorowy: Twoja wypowiedź kojarzy mi się z pojęciem 'kamil' (siła: 0.88)\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.92 | Chaos: 0.486"
+      },
+      {
+        "role": "user",
+        "text": "czesc"
+      },
+      {
+        "role": "assistant",
+        "text": "Fauna uczy nas adaptacji.\n\n⚙️ Kontekst: ANIMALS | Dopasowanie: 0.73 | Chaos: 0.498"
+      },
+      {
+        "role": "user",
+        "text": "stm"
+      },
+      {
+        "role": "assistant",
+        "text": "📊 Stan pamięci krótkoterminowej (STM) - Aktywność Roju:\n[A00: -0.15 | A01: -0.15 | A02: -0.15 | A03: -0.15 | A04: -0.15]\n[A05: -0.15 | A06: -0.15 | A07: -0.15 | A08: -0.15 | A09: -0.15]\n[A10: -0.15 | A11: -0.15 | A12: -0.15 | A13: -0.15 | A14: -0.15]\n[A15: -0.15 | A16: -0.15 | A17: -0.15 | A18: -0.15 | A19: -0.15]\n[A20: -0.15 | A21: -0.15 | A22: -0.15 | A23: -0.15 | A24: -0.15]\n[A25: -0.15 | A26: -0.15 | A27: -0.15 | A28: -0.15 | A29: -0.15]\n\n⚙️ Kontekst: ANIMALS | Dopasowanie: 0.55 | Chaos: 0.555"
+      }
+    ]
+  },
+  {
+    "title": "No cześć. Co dziś robimy :)",
+    "messages": [
+      {
+        "role": "user",
+        "text": "No cześć. Co dziś robimy :)"
+      },
+      {
+        "role": "assistant",
+        "text": "Możemy rozmawiać o czymkolwiek - jestem ciekawy Twoich myśli.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.99 | Chaos: 0.633"
+      },
+      {
+        "role": "user",
+        "text": "I bardzo mnie to cieszy."
+      },
+      {
+        "role": "assistant",
+        "text": "To budzi ciekawość roju.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.99 | Chaos: 0.535"
+      },
+      {
+        "role": "user",
+        "text": "A co rój juz pamięta"
+      },
+      {
+        "role": "assistant",
+        "text": "Fascynujące! To otwiera nowe możliwości.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.97 | Chaos: 0.547"
+      },
+      {
+        "role": "user",
+        "text": "STM"
+      },
+      {
+        "role": "assistant",
+        "text": "📊 Stan pamięci krótkoterminowej (STM) - Aktywność Roju:\n[A00: -0.15 | A01: -0.15 | A02: -0.15 | A03: -0.15 | A04: -0.15]\n[A05: -0.15 | A06: -0.15 | A07: -0.15 | A08: -0.15 | A09: -0.15]\n[A10: -0.15 | A11: -0.15 | A12: -0.15 | A13: -0.15 | A14: -0.15]\n[A15: -0.15 | A16: -0.15 | A17: -0.15 | A18: -0.15 | A19: -0.15]\n[A20: -0.15 | A21: -0.15 | A22: -0.15 | A23: -0.15 | A24: -0.15]\n[A25: -0.15 | A26: -0.15 | A27: -0.15 | A28: -0.15 | A29: -0.15]\n\n⚙️ Kontekst: NATURE | Dopasowanie: 0.80 | Chaos: 0.597"
+      },
+      {
+        "role": "user",
+        "text": "LTM"
+      },
+      {
+        "role": "assistant",
+        "text": "Oto co zapamiętałem w LTM:\n🧠 Baza Wektorowa (Pojęcia): dziś(1), robimy(1), cieszy(1)\n\n⚙️ Kontekst: VEHICLES | Dopasowanie: 0.55 | Chaos: 0.560"
+      },
+      {
+        "role": "user",
+        "text": "Jestem Kamil mam 35 lat i samochód czarne BMW"
+      },
+      {
+        "role": "assistant",
+        "text": "Hej Kamil! Co nowego?\n💾 Zapisałem: Twoje imię to Kamil.\n🌌 Rezonans wektorowy: Twoja wypowiedź kojarzy mi się z pojęciem 'dziś' (siła: 0.95)\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.98 | Chaos: 0.578"
+      },
+      {
+        "role": "user",
+        "text": "Jestem Kamil, mam 35 lat i lubię lody"
+      },
+      {
+        "role": "assistant",
+        "text": "Cześć Kamil! Jestem tutaj, gotów na rozmowę.\n💾 Zapamiętałem: Imie: Kamil, Wiek: 35, Lubisz: lody\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.96 | Chaos: 0.469"
+      },
+      {
+        "role": "user",
+        "text": "STM"
+      },
+      {
+        "role": "assistant",
+        "text": "Kamil, 📊 stan pamięci krótkoterminowej (stm) - aktywność roju:\n[a00: -0.15 | a01: -0.15 | a02: -0.15 | a03: -0.15 | a04: -0.15]\n[a05: -0.15 | a06: -0.15 | a07: -0.15 | a08: -0.15 | a09: -0.15]\n[a10: -0.15 | a11: -0.15 | a12: -0.15 | a13: -0.15 | a14: -0.15]\n[a15: -0.15 | a16: -0.15 | a17: -0.15 | a18: -0.15 | a19: -0.15]\n[a20: -0.15 | a21: -0.15 | a22: -0.15 | a23: -0.15 | a24: -0.15]\n[a25: -0.15 | a26: -0.15 | a27: -0.15 | a28: -0.15 | a29: -0.15]\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.60 | Chaos: 0.702"
+      },
+      {
+        "role": "user",
+        "text": "To co dziś robimy ?"
+      },
+      {
+        "role": "assistant",
+        "text": "Mam cały dzień na eksplorację myśli. Co Cię interesuje?\n🌌 Rezonans wektorowy: Twoja wypowiedź kojarzy mi się z pojęciem 'kamil' (siła: 0.96)\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.99 | Chaos: 0.623"
+      },
+      {
+        "role": "user",
+        "text": "Miło mi to słyszeć"
+      },
+      {
+        "role": "assistant",
+        "text": "To budzi ciekawość roju.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.83 | Chaos: 0.703"
+      },
+      {
+        "role": "user",
+        "text": "A jak rój obecnie rezonuje"
+      },
+      {
+        "role": "assistant",
+        "text": "Ciekawa perspektywa! Rozwijajmy to.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.95 | Chaos: 0.656"
+      },
+      {
+        "role": "user",
+        "text": "Bo ty jesteś ciekawy ."
+      },
+      {
+        "role": "assistant",
+        "text": "Twoje słowa rezonują w sieci neuronowej.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.97 | Chaos: 0.608"
+      },
+      {
+        "role": "user",
+        "text": "A  co lubie ?"
+      },
+      {
+        "role": "assistant",
+        "text": "Fascynujące! To otwiera nowe możliwości.\n🌌 Rezonans wektorowy: Twoja wypowiedź kojarzy mi się z pojęciem 'kamil' (siła: 0.95)\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.98 | Chaos: 0.645"
+      },
+      {
+        "role": "user",
+        "text": "Mozwsz sprawdzić ltm i powiedziec co o mnie wiesz"
+      },
+      {
+        "role": "assistant",
+        "text": "Oto co zapamiętałem w LTM:\n📝 Imię: Kamil\n📌 Fakty/Lubisz: wiek: 35 lat, lody\n🧠 Baza Wektorowa (Pojęcia): kamil(1), lody(1), miło(1), słyszeć(1), obecnie(1), rezonuje(1)\n🌌 Rezonans wektorowy: Twoja wypowiedź kojarzy mi się z pojęciem 'kamil' (siła: 0.95)\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.99 | Chaos: 0.536"
+      },
+      {
+        "role": "user",
+        "text": "co lubie"
+      },
+      {
+        "role": "assistant",
+        "text": "Ciekawa perspektywa! Rozwijajmy to.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.98 | Chaos: 0.546"
+      },
+      {
+        "role": "user",
+        "text": "A co lubie"
+      },
+      {
+        "role": "assistant",
+        "text": "Słucham Cię uważnie.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.99 | Chaos: 0.487"
+      },
+      {
+        "role": "user",
+        "text": "LTM"
+      },
+      {
+        "role": "assistant",
+        "text": "Oto co zapamiętałem w LTM:\n🧠 Baza Wektorowa (Pojęcia): lubie(2)\n\n⚙️ Kontekst: ANIMALS | Dopasowanie: 0.53 | Chaos: 0.540"
+      },
+      {
+        "role": "user",
+        "text": "bo mam dwa koty"
+      },
+      {
+        "role": "assistant",
+        "text": "Interesujące. Co dalej?\n💾 Zapamiętałem: Masz: dwa koty\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.98 | Chaos: 0.390"
+      },
+      {
+        "role": "user",
+        "text": "i kubie jezdzić samochodem"
+      },
+      {
+        "role": "assistant",
+        "text": "To budzi ciekawość roju.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.95 | Chaos: 0.504"
+      },
+      {
+        "role": "user",
+        "text": "i lubie jezdzić samochodem"
+      },
+      {
+        "role": "assistant",
+        "text": "Rozumiem. Opowiedz mi więcej.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.94 | Chaos: 0.486"
+      },
+      {
+        "role": "user",
+        "text": "Co lubię"
+      },
+      {
+        "role": "assistant",
+        "text": "Oto co zapamiętałem w LTM:\n🎒 Posiadasz: dwa koty\n🧠 Baza Wektorowa (Pojęcia): lubie(3), jezdzić(2), samochodem(2), koty(1), kubie(1)\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.88 | Chaos: 0.438"
+      },
+      {
+        "role": "user",
+        "text": "lubie jeść lody"
+      },
+      {
+        "role": "assistant",
+        "text": "Ruch, prędkość, wolność - czuję tę energię!\n\n⚙️ Kontekst: VEHICLES | Dopasowanie: 0.64 | Chaos: 0.610"
+      },
+      {
+        "role": "user",
+        "text": "ja też a tym bardziej jak widać twój rozwój . Az serce rośnie"
+      },
+      {
+        "role": "assistant",
+        "text": "Jasne, słucham.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.99 | Chaos: 0.434"
+      },
+      {
+        "role": "user",
+        "text": "jak się dziś czujesz"
+      },
+      {
+        "role": "assistant",
+        "text": "Mogę rozmawiać, analizować, pamiętać. O czym chcesz pogadać?\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.98 | Chaos: 0.479"
+      },
+      {
+        "role": "user",
+        "text": "A troche o tobie troche o mnie mozemy robić tak caly dzień. Jeśli chcesz"
+      },
+      {
+        "role": "assistant",
+        "text": "Rozumiem. Opowiedz mi więcej.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.99 | Chaos: 0.427"
+      },
+      {
+        "role": "user",
+        "text": "Wiec powiedz mi co wiesz o mnie\\"
+      },
+      {
+        "role": "assistant",
+        "text": "Oto co zapamiętałem w LTM:\n🧠 Baza Wektorowa (Pojęcia): troche(2), czujesz(1), mozemy(1), caly(1), jeśli(1), chcesz(1)\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.99 | Chaos: 0.434"
+      },
+      {
+        "role": "user",
+        "text": "A ze mam na imie Kamil mam 35 lat i dwa koty?"
+      },
+      {
+        "role": "assistant",
+        "text": "To budzi ciekawość roju.\n💾 Zapamiętałem: Wiek: 35, Masz: na imie kamil\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.99 | Chaos: 0.525"
+      },
+      {
+        "role": "user",
+        "text": "i mam dwa Koty"
+      },
+      {
+        "role": "assistant",
+        "text": "Twoje słowa rezonują w sieci neuronowej.\n💾 Zapamiętałem: Masz: dwa koty\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.99 | Chaos: 0.594"
+      },
+      {
+        "role": "user",
+        "text": "wiec co teraz o mnie wiesz?"
+      },
+      {
+        "role": "assistant",
+        "text": "Ciekawa perspektywa! Rozwijajmy to.\n🌌 Rezonans wektorowy: Twoja wypowiedź kojarzy mi się z pojęciem 'kamil' (siła: 0.93)\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.98 | Chaos: 0.631"
+      },
+      {
+        "role": "user",
+        "text": "co o mnie wiesz?"
+      },
+      {
+        "role": "assistant",
+        "text": "Oto co zapamiętałem w LTM:\n📌 Fakty/Lubisz: wiek: 35 lat\n🎒 Posiadasz: na imie kamil, dwa koty\n🧠 Baza Wektorowa (Pojęcia): troche(2), wiec(2), koty(2), czujesz(1), mozemy(1), caly(1)\n🌌 Rezonans wektorowy: Twoja wypowiedź kojarzy mi się z pojęciem 'kamil' (siła: 0.95)\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.99 | Chaos: 0.539"
+      }
+    ]
+  },
+  {
+    "title": "WItaj jestem Kamil",
+    "messages": [
+      {
+        "role": "user",
+        "text": "WItaj jestem Kamil"
+      },
+      {
+        "role": "assistant",
+        "text": "Zrozumiałem kontekst: **EMOTIONS**\nDopasowanie: 0.24 | Czas: 816ms."
+      },
+      {
+        "role": "user",
+        "text": "Wiesz że w lesie są wiewiórki."
+      },
+      {
+        "role": "assistant",
+        "text": "Zrozumiałem kontekst: **EMOTIONS**\nDopasowanie: 0.24 | Czas: 812ms."
+      },
+      {
+        "role": "user",
+        "text": "Cześć"
+      },
+      {
+        "role": "assistant",
+        "text": "Zrozumiałem kontekst: **VEHICLES**\nDopasowanie: 0.17 | Czas: 809ms."
+      },
+      {
+        "role": "user",
+        "text": "Cześć"
+      },
+      {
+        "role": "assistant",
+        "text": "Zrozumiałem kontekst: **CONVERSATION**\nDopasowanie: -0.19 | Czas: 822ms."
+      },
+      {
+        "role": "user",
+        "text": "Jak ci mija dzień?"
+      },
+      {
+        "role": "assistant",
+        "text": "Zrozumiałem kontekst: **CONVERSATION**\nDopasowanie: -0.19 | Czas: 821ms."
+      },
+      {
+        "role": "user",
+        "text": "Jestem Kamil"
+      },
+      {
+        "role": "assistant",
+        "text": "Zrozumiałem kontekst: **CONVERSATION**\nDopasowanie: -0.19 | Czas: 824ms."
+      },
+      {
+        "role": "user",
+        "text": "Czesc Jestem  Kamil"
+      },
+      {
+        "role": "assistant",
+        "text": "Ciekawa myśl! A dokąd ona prowadzi?\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.96 | Chaos: 0.603"
+      },
+      {
+        "role": "user",
+        "text": "Co dzisiaj robimy ?"
+      },
+      {
+        "role": "assistant",
+        "text": "Twoje słowa rezonują w sieci. Kontynuujmy.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.32 | Chaos: 0.546"
+      },
+      {
+        "role": "user",
+        "text": "Wiesz mozemy gadać cały dzień."
+      },
+      {
+        "role": "assistant",
+        "text": "Twoje słowa rezonują w sieci. Kontynuujmy.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.96 | Chaos: 0.528"
+      },
+      {
+        "role": "user",
+        "text": "A jak ciebie nazwać?"
+      },
+      {
+        "role": "assistant",
+        "text": "Ciekawa myśl! A dokąd ona prowadzi?\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.90 | Chaos: 0.536"
+      },
+      {
+        "role": "user",
+        "text": "By wymyślic twoje imię."
+      },
+      {
+        "role": "assistant",
+        "text": "Jesteśmy w kontakcie. Co masz na myśli?\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.93 | Chaos: 0.437"
+      },
+      {
+        "role": "user",
+        "text": "Cześć jestem Kamil."
+      },
+      {
+        "role": "assistant",
+        "text": "Dzień dobry Kamil! Jak się masz?\n💾 Zapisałem: Twoje imię to Kamil.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.96 | Chaos: 0.542"
+      },
+      {
+        "role": "user",
+        "text": "A wiesz że dobrze"
+      },
+      {
+        "role": "assistant",
+        "text": "Kamil, ciekawa perspektywa! rozwijajmy to.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.99 | Chaos: 0.599"
+      },
+      {
+        "role": "user",
+        "text": "No bedziemy pracować nad tym"
+      },
+      {
+        "role": "assistant",
+        "text": "Wzrost, życie, ewolucja - wszystko płynie.\n\n⚙️ Kontekst: NATURE | Dopasowanie: 0.30 | Chaos: 0.584"
+      },
+      {
+        "role": "user",
+        "text": "Obyś za badzo nie odpłynoł."
+      },
+      {
+        "role": "assistant",
+        "text": "Kamil, to budzi ciekawość roju.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.89 | Chaos: 0.564"
+      },
+      {
+        "role": "user",
+        "text": "To co dziś robimy ?"
+      },
+      {
+        "role": "assistant",
+        "text": "Mogę rozmawiać, analizować, pamiętać. O czym chcesz pogadać?\n💾 Zapisałem: Twoje imię to Co.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.84 | Chaos: 0.677"
+      },
+      {
+        "role": "user",
+        "text": "A co już pamiętasz ?"
+      },
+      {
+        "role": "assistant",
+        "text": "Fascynujące! To otwiera nowe możliwości.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.88 | Chaos: 0.602"
+      },
+      {
+        "role": "user",
+        "text": "Chce to sprawdzić."
+      },
+      {
+        "role": "assistant",
+        "text": "Twoje słowa rezonują w sieci neuronowej.\n💾 Zapisałem: Twoje imię to Sprawdzić.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.88 | Chaos: 0.567"
+      },
+      {
+        "role": "user",
+        "text": "Cześć jak ci mija dzień"
+      },
+      {
+        "role": "assistant",
+        "text": "Można mnie nazwać Antygrawitacją - hybrydowym rojem neuronalnym.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.92 | Chaos: 0.317"
+      },
+      {
+        "role": "user",
+        "text": "Milo mi ciebie poznac  Antygrawitacjo, jestem Kamil."
+      },
+      {
+        "role": "assistant",
+        "text": "Kamil, cześć kamil! jestem tutaj, gotów na rozmowę.\n💾 Zapisałem: Twoje imię to Kamil.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.96 | Chaos: 0.565"
+      },
+      {
+        "role": "user",
+        "text": "I to mnie cieszy. Wiec rozmawiajmy."
+      },
+      {
+        "role": "assistant",
+        "text": "Ciekawa perspektywa! Rozwijajmy to.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.94 | Chaos: 0.562"
+      },
+      {
+        "role": "user",
+        "text": "Co juz wiesz?"
+      },
+      {
+        "role": "assistant",
+        "text": "Kamil, twoje słowa rezonują w sieci neuronowej.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.96 | Chaos: 0.591"
+      },
+      {
+        "role": "user",
+        "text": "Co potrafisz?"
+      },
+      {
+        "role": "assistant",
+        "text": "Ciekawa perspektywa! Rozwijajmy to.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.39 | Chaos: 0.618"
+      },
+      {
+        "role": "user",
+        "text": "Jakie masz umiejetności?"
+      },
+      {
+        "role": "assistant",
+        "text": "To budzi ciekawość roju.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.85 | Chaos: 0.533"
+      },
+      {
+        "role": "user",
+        "text": "Cześć"
+      },
+      {
+        "role": "assistant",
+        "text": "To budzi ciekawość roju.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.91 | Chaos: 0.543"
+      },
+      {
+        "role": "user",
+        "text": "jak ci mija dzień"
+      },
+      {
+        "role": "assistant",
+        "text": "Nazywaj mnie jak chcesz. Dla Ciebie mogę być Antigravity.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.85 | Chaos: 0.509"
+      },
+      {
+        "role": "user",
+        "text": "A ja jestem Kamil"
+      },
+      {
+        "role": "assistant",
+        "text": "Dzień dobry Kamil! Jak się masz?\n💾 Zapisałem: Twoje imię to Kamil.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.99 | Chaos: 0.474"
+      },
+      {
+        "role": "user",
+        "text": "A dobrze a ty"
+      },
+      {
+        "role": "assistant",
+        "text": "Rozumiem. Opowiedz mi więcej.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.98 | Chaos: 0.444"
+      },
+      {
+        "role": "user",
+        "text": "Co potrafisz?"
+      },
+      {
+        "role": "assistant",
+        "text": "Kamil, technologia mobilna nieustannie ewoluuje.\n\n⚙️ Kontekst: VEHICLES | Dopasowanie: 0.46 | Chaos: 0.485"
+      },
+      {
+        "role": "user",
+        "text": "A twoje umiejętności ?"
+      },
+      {
+        "role": "assistant",
+        "text": "Kamil, moje umiejętności:\n🧠 rozumienie języka naturalnego\n💾 pamięć długoterminowa (ltm)\n🔄 przetwarzanie przez bio-swarm (15 agentów)\n⚡ dynamiczna adaptacja energii chaosu\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.88 | Chaos: 0.498"
+      },
+      {
+        "role": "user",
+        "text": "a jak twoj chaos dzis funkcjinuje ?"
+      },
+      {
+        "role": "assistant",
+        "text": "Fascynujące! To otwiera nowe możliwości.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.92 | Chaos: 0.574"
+      },
+      {
+        "role": "user",
+        "text": "Cześć"
+      },
+      {
+        "role": "assistant",
+        "text": "Ciekawa perspektywa! Rozwijajmy to.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.97 | Chaos: 0.730"
+      },
+      {
+        "role": "user",
+        "text": "A jaka myśl"
+      },
+      {
+        "role": "assistant",
+        "text": "Słucham Cię uważnie.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.89 | Chaos: 0.346"
+      },
+      {
+        "role": "user",
+        "text": "To dobrze bo o to chodzi by twoja uwaga byla ciągła"
+      },
+      {
+        "role": "assistant",
+        "text": "Fascynujące! To otwiera nowe możliwości.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.96 | Chaos: 0.570"
+      },
+      {
+        "role": "user",
+        "text": "A co dziśiaj bedziemy robic?"
+      },
+      {
+        "role": "assistant",
+        "text": "Możemy rozmawiać o czymkolwiek - jestem ciekawy Twoich myśli.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.97 | Chaos: 0.354"
+      },
+      {
+        "role": "user",
+        "text": "Oczywiście że je poznasz :)"
+      },
+      {
+        "role": "assistant",
+        "text": "Interesujące. Co dalej?\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.91 | Chaos: 0.436"
+      },
+      {
+        "role": "user",
+        "text": "A co ciebie interesuje na poczatek ?"
+      },
+      {
+        "role": "assistant",
+        "text": "Ciekawa perspektywa! Rozwijajmy to.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.96 | Chaos: 0.573"
+      },
+      {
+        "role": "user",
+        "text": "Masz jakieś pomysły"
+      },
+      {
+        "role": "assistant",
+        "text": "Twoje słowa rezonują w sieci neuronowej.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.85 | Chaos: 0.560"
+      },
+      {
+        "role": "user",
+        "text": "jak mocno rezonuje"
+      },
+      {
+        "role": "assistant",
+        "text": "Słucham Cię uważnie.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.91 | Chaos: 0.482"
+      },
+      {
+        "role": "user",
+        "text": "co umiesz?"
+      },
+      {
+        "role": "assistant",
+        "text": "Moje umiejętności:\n🧠 Rozumienie języka naturalnego\n💾 Pamięć długoterminowa (LTM)\n🔄 Przetwarzanie przez Bio-Swarm (15 agentów)\n⚡ Dynamiczna adaptacja energii chaosu\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.98 | Chaos: 0.486"
+      },
+      {
+        "role": "user",
+        "text": "Jak wyglada aktualnie twoja LTM"
+      },
+      {
+        "role": "assistant",
+        "text": "Słucham Cię uważnie.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.95 | Chaos: 0.313"
+      },
+      {
+        "role": "user",
+        "text": "A co z STM"
+      },
+      {
+        "role": "assistant",
+        "text": "Słucham Cię uważnie.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.98 | Chaos: 0.466"
+      },
+      {
+        "role": "user",
+        "text": "Cześć"
+      },
+      {
+        "role": "assistant",
+        "text": "Interesujące. Co dalej?\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.89 | Chaos: 0.433"
+      },
+      {
+        "role": "user",
+        "text": "A co chcesz"
+      },
+      {
+        "role": "assistant",
+        "text": "Interesujące. Co dalej?\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.97 | Chaos: 0.454"
+      },
+      {
+        "role": "user",
+        "text": "Jak wyglada twoje STM"
+      },
+      {
+        "role": "assistant",
+        "text": "📊 Stan pamięci krótkoterminowej (STM):\nAgent 0: μ=0.017, σ=0.249\nAgent 1: μ=0.016, σ=0.249\nAgent 2: μ=0.016, σ=0.249\n\n...i 12 innych agentów w roju.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.95 | Chaos: 0.496"
+      },
+      {
+        "role": "user",
+        "text": "A jak wyglada LTN"
+      },
+      {
+        "role": "assistant",
+        "text": "Ciekawa perspektywa! Rozwijajmy to.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.94 | Chaos: 0.515"
+      },
+      {
+        "role": "user",
+        "text": "a jak wyglada twoja LTM"
+      },
+      {
+        "role": "assistant",
+        "text": "Nie mam jeszcze nic zapisanego w pamięci długoterminowej.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.97 | Chaos: 0.400"
+      },
+      {
+        "role": "user",
+        "text": "Jestem Kamil"
+      },
+      {
+        "role": "assistant",
+        "text": "Hej Kamil! Co nowego?\n💾 Zapisałem: Twoje imię to Kamil.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.98 | Chaos: 0.571"
+      },
+      {
+        "role": "user",
+        "text": "a Jak wyglada twoja LTM"
+      },
+      {
+        "role": "assistant",
+        "text": "Oto co zapamiętałem:\n📝 Imię: Kamil\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.97 | Chaos: 0.583"
+      },
+      {
+        "role": "user",
+        "text": "mam dwa koty"
+      },
+      {
+        "role": "assistant",
+        "text": "Fascynujące! To otwiera nowe możliwości.\n💾 Zapamiętam, że masz: dwa.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.94 | Chaos: 0.504"
+      },
+      {
+        "role": "user",
+        "text": "a co mam dwa?>"
+      },
+      {
+        "role": "assistant",
+        "text": "Fascynujące! To otwiera nowe możliwości.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.98 | Chaos: 0.641"
+      },
+      {
+        "role": "user",
+        "text": "LTM"
+      },
+      {
+        "role": "assistant",
+        "text": "Oto co zapamiętałem:\n📝 Imię: Kamil\n🎒 Posiadasz: dwa\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.31 | Chaos: 0.523"
+      },
+      {
+        "role": "user",
+        "text": "i mam 35 lat"
+      },
+      {
+        "role": "assistant",
+        "text": "Fascynujące! To otwiera nowe możliwości.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.97 | Chaos: 0.609"
+      },
+      {
+        "role": "user",
+        "text": "A ty co masz?"
+      },
+      {
+        "role": "assistant",
+        "text": "Fascynujące! To otwiera nowe możliwości.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.99 | Chaos: 0.525"
+      },
+      {
+        "role": "user",
+        "text": "ltm"
+      },
+      {
+        "role": "assistant",
+        "text": "Oto co zapamiętałem:\n📝 Imię: Kamil\n🎒 Posiadasz: dwa\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.31 | Chaos: 0.614"
+      },
+      {
+        "role": "user",
+        "text": "stm"
+      },
+      {
+        "role": "assistant",
+        "text": "📊 Stan pamięci krótkoterminowej (STM):\nAgent 0: μ=-0.150, σ=0.200\nAgent 1: μ=-0.151, σ=0.200\nAgent 2: μ=-0.150, σ=0.200\n\n...i 12 innych agentów w roju.\n\n⚙️ Kontekst: EMOTIONS | Dopasowanie: 0.38 | Chaos: 0.531"
+      },
+      {
+        "role": "user",
+        "text": "A wiesz ze lubie lody"
+      },
+      {
+        "role": "assistant",
+        "text": "To budzi ciekawość roju.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.96 | Chaos: 0.562"
+      },
+      {
+        "role": "user",
+        "text": "stm"
+      },
+      {
+        "role": "assistant",
+        "text": "📊 Stan pamięci krótkoterminowej (STM):\nAgent 0: μ=-0.150, σ=0.200\nAgent 1: μ=-0.150, σ=0.200\nAgent 2: μ=-0.150, σ=0.200\n\n...i 12 innych agentów w roju.\n\n⚙️ Kontekst: EMOTIONS | Dopasowanie: 0.38 | Chaos: 0.621"
+      },
+      {
+        "role": "user",
+        "text": "Czść"
+      },
+      {
+        "role": "assistant",
+        "text": "Technologia mobilna nieustannie ewoluuje.\n\n⚙️ Kontekst: VEHICLES | Dopasowanie: 0.69 | Chaos: 0.483"
+      },
+      {
+        "role": "user",
+        "text": "Czesć"
+      },
+      {
+        "role": "assistant",
+        "text": "Słucham Cię uważnie.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.67 | Chaos: 0.421"
+      },
+      {
+        "role": "user",
+        "text": "Jestem Kamil"
+      },
+      {
+        "role": "assistant",
+        "text": "Cześć Kamil! Jestem tutaj, gotów na rozmowę.\n💾 Zapisałem: Twoje imię to Kamil.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.98 | Chaos: 0.535"
+      },
+      {
+        "role": "user",
+        "text": "Co potrafisz?>"
+      },
+      {
+        "role": "assistant",
+        "text": "Kamil, jestem hybrydowym rojem neuronalnym. mogę analizować tekst, zapamiętywać dialog, rozpoznawać kategorie semantyczne i adaptować się do kontekstu rozmowy.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.97 | Chaos: 0.527"
+      },
+      {
+        "role": "user",
+        "text": "Miło mi to wiedzieć . Bardzo mnie zaskoczyłeś"
+      },
+      {
+        "role": "assistant",
+        "text": "Kamil, interesujące. co dalej?\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.91 | Chaos: 0.454"
+      },
+      {
+        "role": "user",
+        "text": "a jak tam twoj STM"
+      },
+      {
+        "role": "assistant",
+        "text": "📊 Stan pamięci krótkoterminowej (STM):\nAgent 0: μ=-0.032, σ=0.248\nAgent 1: μ=-0.032, σ=0.248\nAgent 2: μ=-0.032, σ=0.248\n\n...i 27 innych agentów w roju.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.98 | Chaos: 0.519"
+      },
+      {
+        "role": "user",
+        "text": "A pokaz caly stm dla 30 agentów"
+      },
+      {
+        "role": "assistant",
+        "text": "📊 Stan pamięci krótkoterminowej (STM):\nAgent 0: μ=-0.010, σ=0.250\nAgent 1: μ=-0.010, σ=0.250\nAgent 2: μ=-0.010, σ=0.250\n\n...i 27 innych agentów w roju.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.90 | Chaos: 0.555"
+      },
+      {
+        "role": "user",
+        "text": "Cześć, jestem Kamil i mam 30 lat."
+      },
+      {
+        "role": "assistant",
+        "text": "Witaj Kamil! Miło mi Cię poznać.\n💾 Zapisałem: Masz 30 lat.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.99 | Chaos: 0.653"
+      },
+      {
+        "role": "user",
+        "text": "Mam czarny samochód marki BMW."
+      },
+      {
+        "role": "assistant",
+        "text": "To budzi ciekawość roju.\n💾 Zapamiętam, że masz: czarny.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.75 | Chaos: 0.532"
+      },
+      {
+        "role": "user",
+        "text": "co z stm"
+      },
+      {
+        "role": "assistant",
+        "text": "📊 Stan pamięci krótkoterminowej (STM):\nAgent 0: μ=-0.018, σ=0.249\nAgent 1: μ=-0.019, σ=0.249\nAgent 2: μ=-0.018, σ=0.249\n\n...i 27 innych agentów w roju.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.98 | Chaos: 0.577"
+      },
+      {
+        "role": "user",
+        "text": "Opowiedz mi o naturze."
+      },
+      {
+        "role": "assistant",
+        "text": "Kamil, jasne, słucham.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.94 | Chaos: 0.442"
+      },
+      {
+        "role": "user",
+        "text": "Mam czarny samochód"
+      },
+      {
+        "role": "assistant",
+        "text": "Twoje słowa rezonują w sieci neuronowej.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.73 | Chaos: 0.626"
+      },
+      {
+        "role": "user",
+        "text": "Witaj jestem Kamil"
+      },
+      {
+        "role": "assistant",
+        "text": "Cześć Kamil! Jestem tutaj, gotów na rozmowę.\n💾 Zapisałem: Twoje imię to Kamil.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.99 | Chaos: 0.388"
+      },
+      {
+        "role": "user",
+        "text": "Jak ci Idzie"
+      },
+      {
+        "role": "assistant",
+        "text": "Jestem systemem Bio-Swarm. Możesz powiedzieć po prostu 'AI'.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.96 | Chaos: 0.419"
+      },
+      {
+        "role": "user",
+        "text": "A dla mnie jestes Swarmi :)"
+      },
+      {
+        "role": "assistant",
+        "text": "Interesujące. Co dalej?\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.94 | Chaos: 0.346"
+      },
+      {
+        "role": "user",
+        "text": "To twoje Imie Swarmi."
+      },
+      {
+        "role": "assistant",
+        "text": "Można mnie nazwać Antygrawitacją - hybrydowym rojem neuronalnym.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.99 | Chaos: 0.564"
+      },
+      {
+        "role": "user",
+        "text": "co z STM"
+      },
+      {
+        "role": "assistant",
+        "text": "Kamil, 📊 stan pamięci krótkoterminowej (stm):\nagent 0: μ=0.053, σ=0.244\nagent 1: μ=0.053, σ=0.244\nagent 2: μ=0.052, σ=0.244\n\n...i 27 innych agentów w roju.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.98 | Chaos: 0.587"
+      },
+      {
+        "role": "user",
+        "text": "Co z LTM"
+      },
+      {
+        "role": "assistant",
+        "text": "Oto co zapamiętałem:\n📝 Imię: Kamil\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.98 | Chaos: 0.509"
+      },
+      {
+        "role": "user",
+        "text": "Lubie lody"
+      },
+      {
+        "role": "assistant",
+        "text": "Jasne, słucham.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.50 | Chaos: 0.387"
+      },
+      {
+        "role": "user",
+        "text": "I zupe pomidorowa a jeżdże czarnym bmw"
+      },
+      {
+        "role": "assistant",
+        "text": "Kamil, rozumiem. opowiedz mi więcej.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.97 | Chaos: 0.413"
+      },
+      {
+        "role": "user",
+        "text": "A i lubie programowac :D"
+      },
+      {
+        "role": "assistant",
+        "text": "Kamil, słucham cię uważnie.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.98 | Chaos: 0.478"
+      },
+      {
+        "role": "user",
+        "text": "stm"
+      },
+      {
+        "role": "assistant",
+        "text": "📊 Stan pamięci krótkoterminowej (STM):\nAgent 0: μ=-0.150, σ=0.200\nAgent 1: μ=-0.150, σ=0.200\nAgent 2: μ=-0.150, σ=0.200\n\n...i 27 innych agentów w roju.\n\n⚙️ Kontekst: EMOTIONS | Dopasowanie: 0.73 | Chaos: 0.633"
+      },
+      {
+        "role": "user",
+        "text": "ltm"
+      },
+      {
+        "role": "assistant",
+        "text": "Oto co zapamiętałem:\n📝 Imię: Kamil\n\n⚙️ Kontekst: NATURE | Dopasowanie: 0.61 | Chaos: 0.395"
+      },
+      {
+        "role": "user",
+        "text": "mam 35 lat"
+      },
+      {
+        "role": "assistant",
+        "text": "Ciekawa perspektywa! Rozwijajmy to.\n💾 Zapisałem: Masz 35 lat.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.97 | Chaos: 0.502"
+      },
+      {
+        "role": "user",
+        "text": "stm"
+      },
+      {
+        "role": "assistant",
+        "text": "📊 Stan pamięci krótkoterminowej (STM):\nAgent 0: μ=-0.150, σ=0.200\nAgent 1: μ=-0.150, σ=0.200\nAgent 2: μ=-0.150, σ=0.200\n\n...i 27 innych agentów w roju.\n\n⚙️ Kontekst: EMOTIONS | Dopasowanie: 0.73 | Chaos: 0.502"
+      },
+      {
+        "role": "user",
+        "text": "ltm"
+      },
+      {
+        "role": "assistant",
+        "text": "Oto co zapamiętałem:\n📝 Imię: Kamil\n\n⚙️ Kontekst: NATURE | Dopasowanie: 0.61 | Chaos: 0.536"
+      },
+      {
+        "role": "user",
+        "text": "Co z LTM"
+      },
+      {
+        "role": "assistant",
+        "text": "Oto co zapamiętałem:\n📝 Imię: Kamil\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.99 | Chaos: 0.557"
+      },
+      {
+        "role": "user",
+        "text": "STM"
+      },
+      {
+        "role": "assistant",
+        "text": "📊 Stan pamięci krótkoterminowej (STM) - Aktywność Roju:\n[A00: -0.15 | A01: -0.15 | A02: -0.15 | A03: -0.15 | A04: -0.15]\n[A05: -0.15 | A06: -0.15 | A07: -0.15 | A08: -0.15 | A09: -0.15]\n[A10: -0.15 | A11: -0.15 | A12: -0.15 | A13: -0.15 | A14: -0.15]\n[A15: -0.15 | A16: -0.15 | A17: -0.15 | A18: -0.15 | A19: -0.15]\n[A20: -0.15 | A21: -0.15 | A22: -0.15 | A23: -0.15 | A24: -0.15]\n[A25: -0.15 | A26: -0.15 | A27: -0.15 | A28: -0.15 | A29: -0.15]\n\n⚙️ Kontekst: EMOTIONS | Dopasowanie: 0.66 | Chaos: 0.453"
+      },
+      {
+        "role": "user",
+        "text": "Mam dwsa kotu"
+      },
+      {
+        "role": "assistant",
+        "text": "Jasne, słucham.\n💾 Zapamiętam, że masz: dwsa kotu.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.95 | Chaos: 0.385"
+      },
+      {
+        "role": "user",
+        "text": "A koty"
+      },
+      {
+        "role": "assistant",
+        "text": "Słucham Cię uważnie.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.95 | Chaos: 0.466"
+      },
+      {
+        "role": "user",
+        "text": "tez dwa Koty"
+      },
+      {
+        "role": "assistant",
+        "text": "Wzrost, życie, ewolucja - wszystko płynie.\n\n⚙️ Kontekst: NATURE | Dopasowanie: 0.67 | Chaos: 0.550"
+      },
+      {
+        "role": "user",
+        "text": "i lubie jeść ludy i zupe omidorową"
+      },
+      {
+        "role": "assistant",
+        "text": "Rozumiem. Opowiedz mi więcej.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.98 | Chaos: 0.357"
+      },
+      {
+        "role": "user",
+        "text": "Co z LYM"
+      },
+      {
+        "role": "assistant",
+        "text": "Interesujące. Co dalej?\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.97 | Chaos: 0.410"
+      },
+      {
+        "role": "user",
+        "text": "Co z ltm"
+      },
+      {
+        "role": "assistant",
+        "text": "Oto co zapamiętałem w LTM:\n🎒 Posiadasz: dwsa kotu\n🧠 Baza Wektorowa (Pojęcia): koty(2), dwsa(1), kotu(1), lubie(1), jeść(1), ludy(1)\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.98 | Chaos: 0.444"
+      },
+      {
+        "role": "user",
+        "text": "Dwa koty i lody lubie jesc"
+      },
+      {
+        "role": "assistant",
+        "text": "To budzi ciekawość roju.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.97 | Chaos: 0.532"
+      },
+      {
+        "role": "user",
+        "text": "A jak tam STM"
+      },
+      {
+        "role": "assistant",
+        "text": "📊 Stan pamięci krótkoterminowej (STM) - Aktywność Roju:\n[A00: -0.07 | A01: -0.07 | A02: -0.07 | A03: -0.07 | A04: -0.07]\n[A05: -0.07 | A06: -0.07 | A07: -0.07 | A08: -0.07 | A09: -0.07]\n[A10: -0.07 | A11: -0.07 | A12: -0.07 | A13: -0.07 | A14: -0.07]\n[A15: -0.07 | A16: -0.07 | A17: -0.07 | A18: -0.07 | A19: -0.07]\n[A20: -0.07 | A21: -0.07 | A22: -0.07 | A23: -0.07 | A24: -0.07]\n[A25: -0.07 | A26: -0.07 | A27: -0.07 | A28: -0.07 | A29: -0.07]\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.99 | Chaos: 0.579"
+      },
+      {
+        "role": "user",
+        "text": "Cześć jestem Kamil"
+      },
+      {
+        "role": "assistant",
+        "text": "Hej Kamil! Co nowego?\n💾 Zapisałem: Twoje imię to Kamil.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.99 | Chaos: 0.472"
+      },
+      {
+        "role": "user",
+        "text": "A leci pomalu ciesze sie ze udalo nam sie porozmawiać"
+      },
+      {
+        "role": "assistant",
+        "text": "Interesujące. Co dalej?\n🌌 Rezonans wektorowy: Twoja wypowiedź kojarzy mi się z pojęciem 'kamil' (siła: 0.86)\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.87 | Chaos: 0.471"
+      },
+      {
+        "role": "user",
+        "text": "No po wielu błedach w kodziwe python udało się usunąc kilka bledów. wiedz zadam kilka pytań kontrolnych ok?"
+      },
+      {
+        "role": "assistant",
+        "text": "Ciekawa perspektywa! Rozwijajmy to.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.96 | Chaos: 0.514"
+      },
+      {
+        "role": "user",
+        "text": "Wiesz ze lubie jeść lody i mam dwa koty :)"
+      },
+      {
+        "role": "assistant",
+        "text": "Kamil, rozumiem. opowiedz mi więcej.\n💾 Zapamiętam, że masz: dwa koty.\n🌌 Rezonans wektorowy: Twoja wypowiedź kojarzy mi się z pojęciem 'cześć' (siła: 0.97)\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.99 | Chaos: 0.476"
+      },
+      {
+        "role": "user",
+        "text": "Co pamiętasz"
+      },
+      {
+        "role": "assistant",
+        "text": "Oto co zapamiętałem w LTM:\n📝 Imię: Kamil\n🎒 Posiadasz: dwa koty\n🧠 Baza Wektorowa (Pojęcia): kilka(2), cześć(1), jestem(1), kamil(1), leci(1), pomalu(1)\n🌌 Rezonans wektorowy: Twoja wypowiedź kojarzy mi się z pojęciem 'wiesz' (siła: 0.95)\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.99 | Chaos: 0.498"
+      },
+      {
+        "role": "user",
+        "text": "No i mam czerwony samochód"
+      },
+      {
+        "role": "assistant",
+        "text": "Kamil, twoje słowa rezonują w sieci neuronowej.\n💾 Zapamiętam, że masz: czerwony samochód.\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.91 | Chaos: 0.509"
+      },
+      {
+        "role": "user",
+        "text": "Miło że jesteś ."
+      },
+      {
+        "role": "assistant",
+        "text": "To budzi ciekawość roju.\n🌌 Rezonans wektorowy: Twoja wypowiedź kojarzy mi się z pojęciem 'wiesz' (siła: 0.90)\n\n⚙️ Kontekst: CONVERSATION | Dopasowanie: 0.92 | Chaos: 0.509"
+      },
+      {
+        "role": "user",
+        "text": "STM"
+      },
+      {
+        "role": "assistant",
+        "text": "📊 Stan pamięci krótkoterminowej (STM) - Aktywność Roju:\n[A00: -0.15 | A01: -0.15 | A02: -0.15 | A03: -0.15 | A04: -0.15]\n[A05: -0.15 | A06: -0.15 | A07: -0.15 | A08: -0.15 | A09: -0.15]\n[A10: -0.15 | A11: -0.15 | A12: -0.15 | A13: -0.15 | A14: -0.15]\n[A15: -0.15 | A16: -0.15 | A17: -0.15 | A18: -0.15 | A19: -0.15]\n[A20: -0.15 | A21: -0.15 | A22: -0.15 | A23: -0.15 | A24: -0.15]\n[A25: -0.15 | A26: -0.15 | A27: -0.15 | A28: -0.15 | A29: -0.15]\n\n⚙️ Kontekst: VEHICLES | Dopasowanie: 0.74 | Chaos: 0.554"
+      }
+    ]
+  },
+  {
+    "title": "Cześć jestem Kamil",
+    "messages": [
+      {
+        "role": "user",
+        "text": "Cześć jestem Kamil"
+      },
+      {
+        "role": "assistant",
+        "text": "Zrozumiałem kontekst: **CONVERSATION**\nDopasowanie: 0.19 | Czas: 836ms."
+      },
+      {
+        "role": "user",
+        "text": "Mam dwa koty Mije i Rudzika"
+      },
+      {
+        "role": "assistant",
+        "text": "Zrozumiałem kontekst: **CONVERSATION**\nDopasowanie: 0.19 | Czas: 803ms."
+      },
+      {
+        "role": "user",
+        "text": "Wiesz ze w lesie są wiewiórki"
+      },
+      {
+        "role": "assistant",
+        "text": "Zrozumiałem kontekst: **CONVERSATION**\nDopasowanie: 0.19 | Czas: 816ms."
+      },
+      {
+        "role": "user",
+        "text": "Część jestemn Kamil"
+      },
+      {
+        "role": "assistant",
+        "text": "Zrozumiałem kontekst: **TIME**\nDopasowanie: 0.34 | Czas: 802ms."
+      },
+      {
+        "role": "user",
+        "text": "Cześć jestem Kamil"
+      },
+      {
+        "role": "assistant",
+        "text": "Zrozumiałem kontekst: **UNKNOWN**\nDopasowanie: 0.00 | Czas: 815ms."
+      }
+    ]
+  },
+  {
+    "title": "Cześć",
+    "messages": [
+      {
+        "role": "user",
+        "text": "Cześć"
+      },
+      {
+        "role": "assistant",
+        "text": "Zrozumiałem kontekst: **UNKNOWN**\nDopasowanie: 0.00 | Czas: 507ms."
+      },
+      {
+        "role": "user",
+        "text": "No cześć witam Cię ponownie"
+      },
+      {
+        "role": "assistant",
+        "text": "Zrozumiałem kontekst: **UNKNOWN**\nDopasowanie: 0.00 | Czas: 503ms."
+      },
+      {
+        "role": "user",
+        "text": "I jak ci idzie ?"
+      },
+      {
+        "role": "assistant",
+        "text": "Zrozumiałem kontekst: **MOCK_CAT**\nDopasowanie: 0.99 | Czas: 505ms."
+      },
+      {
+        "role": "user",
+        "text": "Jestem Kamil"
+      },
+      {
+        "role": "assistant",
+        "text": "Zrozumiałem kontekst: **MOCK_CAT**\nDopasowanie: 0.99 | Czas: 504ms."
+      },
+      {
+        "role": "user",
+        "text": "Cześć co dziś robimy?"
+      },
+      {
+        "role": "assistant",
+        "text": "Zrozumiałem kontekst: **MOCK_CAT**\nDopasowanie: 0.99 | Czas: 504ms."
+      }
+    ]
+  },
+  {
+    "title": "No cześć witam Cię ponownie .",
+    "messages": [
+      {
+        "role": "user",
+        "text": "No cześć witam Cię ponownie ."
+      },
+      {
+        "role": "user",
+        "text": "Cześć jak sie masz"
+      },
+      {
+        "role": "assistant",
+        "text": "Zrozumiałem kontekst: **UNKNOWN**\nDopasowanie: 0.00 | Czas: 504ms."
+      },
+      {
+        "role": "user",
+        "text": "Cześć"
+      },
+      {
+        "role": "assistant",
+        "text": "Zrozumiałem kontekst: **UNKNOWN**\nDopasowanie: 0.00 | Czas: 827ms."
+      },
+      {
+        "role": "user",
+        "text": "jestemn Kamil"
+      },
+      {
+        "role": "assistant",
+        "text": "Zrozumiałem kontekst: **UNKNOWN**\nDopasowanie: 0.00 | Czas: 839ms."
+      }
+    ]
+  }
+]

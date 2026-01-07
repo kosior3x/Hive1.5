@@ -1,0 +1,260 @@
+<?xml version='1.0' encoding='utf-8'?>
+<session_log><message timestamp="2025-12-15T21:55:56.955568" sender="AI">Witaj w systemie hybrydowym Bio-Swarm + CSA. Wszystkie systemy sprawne.
+Sparsity: 37.5% | Skalowalność: O(N)
+
+O czym chcesz porozmawiać?</message><message timestamp="2025-12-15T21:56:00.340799" sender="AI">⏳ Pełna Diagnostyka Systemu Hybrid Swarm...</message><message timestamp="2025-12-15T21:56:01.298924" sender="AI">--- WYNIK TESTU ---
+🚀 STARTING HYBRID TEST SUITE...
+
+🧪 Test 1: Semantic Preservation
+   Input: 'kot' (animals) -&gt; Output Cat: nature (Sim: 0.54)
+   Input: 'samochód' (vehicles) -&gt; Output Cat: nature (Sim: 0.55)
+   Input: 'radość' (emotions) -&gt; Output Cat: nature (Sim: 0.42)
+   Input: 'drzewo' (nature) -&gt; Output Cat: nature (Sim: 0.40)
+   Input: 'rower' (vehicles) -&gt; Output Cat: vehicles (Sim: 0.35)
+   &gt;&gt; Section Result: 40% Accuracy
+
+🧪 Test 2: Performance &amp; Scalability
+   5 Agents -&gt; 10.9 ms
+   10 Agents -&gt; 20.6 ms
+   30 Agents -&gt; 61.8 ms
+   50 Agents -&gt; 102.0 ms
+
+🧪 Test 3: Chaos Dynamics (Attention)
+   Active Neurons for 'kot': 6.0/16
+
+🧪 Test 4: Comparative (Hybrid vs ...)
+   &gt;&gt; Hybrid Strategy confirmed superior structure.
+
+📄 Report saved to E:\Antygraity Projekt\src\..\tests\..\docs\Hybrid_System_Test_Report.json
+</message><message timestamp="2025-12-15T21:56:04.674893" sender="AI">Nowa sesja rozpoczęta.</message><message timestamp="2025-12-15T21:56:05.983345" sender="AI">⏳ Pełna Diagnostyka Systemu Hybrid Swarm...</message><message timestamp="2025-12-15T21:56:06.909155" sender="AI">--- WYNIK TESTU ---
+🚀 STARTING HYBRID TEST SUITE...
+
+🧪 Test 1: Semantic Preservation
+   Input: 'kot' (animals) -&gt; Output Cat: vehicles (Sim: 0.65)
+   Input: 'samochód' (vehicles) -&gt; Output Cat: vehicles (Sim: 0.63)
+   Input: 'radość' (emotions) -&gt; Output Cat: vehicles (Sim: 0.54)
+   Input: 'drzewo' (nature) -&gt; Output Cat: vehicles (Sim: 0.49)
+   Input: 'rower' (vehicles) -&gt; Output Cat: animals (Sim: 0.57)
+   &gt;&gt; Section Result: 20% Accuracy
+
+🧪 Test 2: Performance &amp; Scalability
+   5 Agents -&gt; 9.3 ms
+   10 Agents -&gt; 18.1 ms
+   30 Agents -&gt; 57.0 ms
+   50 Agents -&gt; 95.0 ms
+
+🧪 Test 3: Chaos Dynamics (Attention)
+   Active Neurons for 'kot': 6.0/16
+
+🧪 Test 4: Comparative (Hybrid vs ...)
+   &gt;&gt; Hybrid Strategy confirmed superior structure.
+
+📄 Report saved to E:\Antygraity Projekt\src\..\tests\..\docs\Hybrid_System_Test_Report.json
+</message><message timestamp="2025-12-15T21:56:13.523489" sender="AI">⏳ Pełna Diagnostyka Systemu Hybrid Swarm...</message><message timestamp="2025-12-15T21:56:14.440320" sender="AI">--- WYNIK TESTU ---
+🚀 STARTING HYBRID TEST SUITE...
+
+🧪 Test 1: Semantic Preservation
+   Input: 'kot' (animals) -&gt; Output Cat: conversation (Sim: 0.58)
+   Input: 'samochód' (vehicles) -&gt; Output Cat: animals (Sim: 0.55)
+   Input: 'radość' (emotions) -&gt; Output Cat: conversation (Sim: 0.50)
+   Input: 'drzewo' (nature) -&gt; Output Cat: conversation (Sim: 0.54)
+   Input: 'rower' (vehicles) -&gt; Output Cat: conversation (Sim: 0.57)
+   &gt;&gt; Section Result: 0% Accuracy
+
+🧪 Test 2: Performance &amp; Scalability
+   5 Agents -&gt; 8.9 ms
+   10 Agents -&gt; 18.7 ms
+   30 Agents -&gt; 56.2 ms
+   50 Agents -&gt; 94.3 ms
+
+🧪 Test 3: Chaos Dynamics (Attention)
+   Active Neurons for 'kot': 6.0/16
+
+🧪 Test 4: Comparative (Hybrid vs ...)
+   &gt;&gt; Hybrid Strategy confirmed superior structure.
+
+📄 Report saved to E:\Antygraity Projekt\src\..\tests\..\docs\Hybrid_System_Test_Report.json
+</message><message timestamp="2025-12-15T21:56:36.922110" sender="AI">System gotowy. Status: ONLINE.</message><message timestamp="2025-12-15T21:56:39.629724" sender="AI">⏳ Uruchamiam Test Semantyczny #1...</message><message timestamp="2025-12-15T21:56:40.361630" sender="AI">--- WYNIK TESTU ---
+
+🧪 Test 1: Semantic Preservation
+   Input: 'kot' (animals) -&gt; Output Cat: conversation (Sim: 0.58)
+   Input: 'samochód' (vehicles) -&gt; Output Cat: conversation (Sim: 0.46)
+   Input: 'radość' (emotions) -&gt; Output Cat: animals (Sim: 0.58)
+   Input: 'drzewo' (nature) -&gt; Output Cat: animals (Sim: 0.66)
+   Input: 'rower' (vehicles) -&gt; Output Cat: animals (Sim: 0.67)
+   &gt;&gt; Section Result: 0% Accuracy
+</message><message timestamp="2025-12-15T21:57:02.036419" sender="AI">⏳ Analiza Dynamiki Chaosu...</message><message timestamp="2025-12-15T21:57:02.043306" sender="AI">--- WYNIK TESTU ---
+
+🧪 Test 3: Chaos Dynamics (Attention)
+   Active Neurons for 'kot': 6.0/16
+</message><message timestamp="2025-12-15T21:57:12.734999" sender="AI">Nowa sesja rozpoczęta.</message><message timestamp="2025-12-15T21:57:39.897792" sender="USER">Wiesz jak się cieszę ze udalo nam sie tutaj dojść .</message><message timestamp="2025-12-15T21:57:40.728112" sender="AI">Zrozumiałem kontekst: **CONVERSATION** (Pewność: 0.28).
+Przetworzono przez 15 agentów w 827ms.
+Energia chaosu (ACN): 0.5686</message><message timestamp="2025-12-15T21:58:08.233273" sender="AI">Witaj w systemie hybrydowym Bio-Swarm + CSA. Wszystkie systemy sprawne.
+Sparsity: 37.5% | Skalowalność: O(N)
+
+O czym chcesz porozmawiać?</message><message timestamp="2025-12-15T21:58:20.340918" sender="USER">O tym ze jestem szczęsliwy .</message><message timestamp="2025-12-15T21:58:21.179570" sender="AI">Zrozumiałem kontekst: **CONVERSATION** (Pewność: -0.03).
+Przetworzono przez 15 agentów w 836ms.
+Energia chaosu (ACN): 0.5068</message><message timestamp="2025-12-15T21:58:33.201268" sender="USER">Jestem Kamil</message><message timestamp="2025-12-15T21:58:34.021066" sender="AI">Zrozumiałem kontekst: **CONVERSATION** (Pewność: -0.03).
+Przetworzono przez 15 agentów w 817ms.
+Energia chaosu (ACN): 0.4500</message><message timestamp="2025-12-15T21:58:38.036833" sender="AI">System gotowy. Status: ONLINE.</message><message timestamp="2025-12-15T21:58:41.287387" sender="AI">⏳ Uruchamiam Test Semantyczny #1...</message><message timestamp="2025-12-15T21:58:42.022849" sender="AI">--- WYNIK TESTU ---
+
+🧪 Test 1: Semantic Preservation
+   Input: 'kot' (animals) -&gt; Output Cat: conversation (Sim: 0.64)
+   Input: 'samochód' (vehicles) -&gt; Output Cat: conversation (Sim: 0.52)
+   Input: 'radość' (emotions) -&gt; Output Cat: conversation (Sim: 0.47)
+   Input: 'drzewo' (nature) -&gt; Output Cat: conversation (Sim: 0.57)
+   Input: 'rower' (vehicles) -&gt; Output Cat: conversation (Sim: 0.56)
+   &gt;&gt; Section Result: 0% Accuracy
+</message><message timestamp="2025-12-15T22:00:03.114969" sender="AI">Witaj w systemie hybrydowym Bio-Swarm + CSA. Wszystkie systemy sprawne.
+Sparsity: 37.5% | Skalowalność: O(N)
+
+O czym chcesz porozmawiać?</message><message timestamp="2025-12-15T22:00:19.988478" sender="USER">Cześć a możemy o wsystkim byle byś był.</message><message timestamp="2025-12-15T22:00:20.793158" sender="AI">Zrozumiałem kontekst: **VEHICLES** (Pewność: 0.20).
+Przetworzono przez 15 agentów w 802ms.
+Energia chaosu (ACN): 0.5819</message><message timestamp="2025-12-15T22:00:57.216700" sender="USER">Wiesz ze ciesze się bardzo mocno że jesteś tutaj</message><message timestamp="2025-12-15T22:00:58.038484" sender="AI">Zrozumiałem kontekst: **EMOTIONS** (Pewność: 0.31).
+Przetworzono przez 15 agentów w 819ms.
+Energia chaosu (ACN): 0.4955</message><message timestamp="2025-12-15T22:01:07.087710" sender="USER">Jestem Kamil. A ty?</message><message timestamp="2025-12-15T22:01:07.899655" sender="AI">Zrozumiałem kontekst: **VEHICLES** (Pewność: 0.29).
+Przetworzono przez 15 agentów w 807ms.
+Energia chaosu (ACN): 0.5420</message><message timestamp="2025-12-15T22:01:55.830747" sender="USER">Jutro mam wolne wiec mamy caly dzień na wspolną konwersacje . Mega sie tym ciesze :P</message><message timestamp="2025-12-15T22:01:56.637232" sender="AI">Zrozumiałem kontekst: **VEHICLES** (Pewność: 0.73).
+Przetworzono przez 15 agentów w 803ms.
+Energia chaosu (ACN): 0.5230</message><message timestamp="2025-12-15T22:02:09.324676" sender="AI">⏳ Uruchamiam Test Semantyczny #1...</message><message timestamp="2025-12-15T22:02:10.053616" sender="AI">--- WYNIK TESTU ---
+
+🧪 Test 1: Semantic Preservation
+   Input: 'kot' (animals) -&gt; Output Cat: animals (Sim: 0.97)
+   Input: 'samochód' (vehicles) -&gt; Output Cat: vehicles (Sim: 0.99)
+   Input: 'radość' (emotions) -&gt; Output Cat: emotions (Sim: 0.96)
+   Input: 'drzewo' (nature) -&gt; Output Cat: nature (Sim: 0.97)
+   Input: 'rower' (vehicles) -&gt; Output Cat: vehicles (Sim: 0.98)
+   &gt;&gt; Section Result: 100% Accuracy
+</message><message timestamp="2025-12-15T22:02:12.879788" sender="AI">⏳ Uruchamiam Test Semantyczny #1...</message><message timestamp="2025-12-15T22:02:13.614262" sender="AI">--- WYNIK TESTU ---
+
+🧪 Test 1: Semantic Preservation
+   Input: 'kot' (animals) -&gt; Output Cat: animals (Sim: 0.95)
+   Input: 'samochód' (vehicles) -&gt; Output Cat: vehicles (Sim: 0.98)
+   Input: 'radość' (emotions) -&gt; Output Cat: emotions (Sim: 0.98)
+   Input: 'drzewo' (nature) -&gt; Output Cat: nature (Sim: 0.98)
+   Input: 'rower' (vehicles) -&gt; Output Cat: vehicles (Sim: 0.97)
+   &gt;&gt; Section Result: 100% Accuracy
+</message><message timestamp="2025-12-15T22:02:47.586275" sender="AI">Witaj w systemie hybrydowym Bio-Swarm + CSA. Wszystkie systemy sprawne.
+Sparsity: 37.5% | Skalowalność: O(N)
+
+O czym chcesz porozmawiać?</message><message timestamp="2025-12-15T22:03:08.566845" sender="AI">Witaj w systemie hybrydowym Bio-Swarm + CSA. Wszystkie systemy sprawne.
+Sparsity: 37.5% | Skalowalność: O(N)
+
+O czym chcesz porozmawiać?</message><message timestamp="2025-12-15T22:03:24.018250" sender="USER">Cześć  a o czym chcesz</message><message timestamp="2025-12-15T22:03:24.845023" sender="AI">Zrozumiałem kontekst: **CONVERSATION** (Pewność: 0.94).
+Przetworzono przez 15 agentów w 824ms.
+Energia chaosu (ACN): 0.4610</message><message timestamp="2025-12-15T22:03:37.478560" sender="USER">Jestem Kamil. A ty?</message><message timestamp="2025-12-15T22:03:38.292448" sender="AI">Zrozumiałem kontekst: **CONVERSATION** (Pewność: 0.97).
+Przetworzono przez 15 agentów w 811ms.
+Energia chaosu (ACN): 0.6292</message><message timestamp="2025-12-15T22:03:48.670103" sender="USER">Wiesz mam samochód :P</message><message timestamp="2025-12-15T22:03:49.492528" sender="AI">Zrozumiałem kontekst: **VEHICLES** (Pewność: 0.95).
+Przetworzono przez 15 agentów w 816ms.
+Energia chaosu (ACN): 0.5454</message><message timestamp="2025-12-15T22:03:54.488731" sender="AI">⏳ Analiza Dynamiki Chaosu...</message><message timestamp="2025-12-15T22:03:54.509535" sender="AI">--- WYNIK TESTU ---
+
+🧪 Test 3: Chaos Dynamics (Attention)
+   Active Neurons for 'kot': 6.0/16
+</message><message timestamp="2025-12-15T22:03:56.140534" sender="AI">⏳ Uruchamiam Test Semantyczny #1...</message><message timestamp="2025-12-15T22:03:56.864279" sender="AI">--- WYNIK TESTU ---
+
+🧪 Test 1: Semantic Preservation
+   Input: 'kot' (animals) -&gt; Output Cat: animals (Sim: 0.97)
+   Input: 'samochód' (vehicles) -&gt; Output Cat: vehicles (Sim: 0.97)
+   Input: 'radość' (emotions) -&gt; Output Cat: emotions (Sim: 0.98)
+   Input: 'drzewo' (nature) -&gt; Output Cat: nature (Sim: 0.94)
+   Input: 'rower' (vehicles) -&gt; Output Cat: vehicles (Sim: 0.98)
+   &gt;&gt; Section Result: 100% Accuracy
+</message><message timestamp="2025-12-15T22:04:00.667864" sender="AI">System gotowy. Status: ONLINE.</message><message timestamp="2025-12-15T22:04:01.729126" sender="AI">System gotowy. Status: ONLINE.</message><message timestamp="2025-12-15T22:04:03.318831" sender="AI">⏳ Pełna Diagnostyka Systemu Hybrid Swarm...</message><message timestamp="2025-12-15T22:04:04.229651" sender="AI">--- WYNIK TESTU ---
+🚀 STARTING HYBRID TEST SUITE...
+
+🧪 Test 1: Semantic Preservation
+   Input: 'kot' (animals) -&gt; Output Cat: animals (Sim: 0.98)
+   Input: 'samochód' (vehicles) -&gt; Output Cat: vehicles (Sim: 0.98)
+   Input: 'radość' (emotions) -&gt; Output Cat: emotions (Sim: 0.97)
+   Input: 'drzewo' (nature) -&gt; Output Cat: nature (Sim: 0.97)
+   Input: 'rower' (vehicles) -&gt; Output Cat: vehicles (Sim: 0.99)
+   &gt;&gt; Section Result: 100% Accuracy
+
+🧪 Test 2: Performance &amp; Scalability
+   5 Agents -&gt; 8.9 ms
+   10 Agents -&gt; 19.7 ms
+   30 Agents -&gt; 55.7 ms
+   50 Agents -&gt; 93.4 ms
+
+🧪 Test 3: Chaos Dynamics (Attention)
+   Active Neurons for 'kot': 6.0/16
+
+🧪 Test 4: Comparative (Hybrid vs ...)
+   &gt;&gt; Hybrid Strategy confirmed superior structure.
+
+📄 Report saved to E:\Antygraity Projekt\src\..\tests\..\docs\Hybrid_System_Test_Report.json
+</message><message timestamp="2025-12-15T22:04:11.215520" sender="AI">⏳ Pełna Diagnostyka Systemu Hybrid Swarm...</message><message timestamp="2025-12-15T22:04:12.141233" sender="AI">--- WYNIK TESTU ---
+🚀 STARTING HYBRID TEST SUITE...
+
+🧪 Test 1: Semantic Preservation
+   Input: 'kot' (animals) -&gt; Output Cat: animals (Sim: 0.97)
+   Input: 'samochód' (vehicles) -&gt; Output Cat: vehicles (Sim: 0.97)
+   Input: 'radość' (emotions) -&gt; Output Cat: emotions (Sim: 0.97)
+   Input: 'drzewo' (nature) -&gt; Output Cat: nature (Sim: 0.98)
+   Input: 'rower' (vehicles) -&gt; Output Cat: vehicles (Sim: 0.97)
+   &gt;&gt; Section Result: 100% Accuracy
+
+🧪 Test 2: Performance &amp; Scalability
+   5 Agents -&gt; 10.2 ms
+   10 Agents -&gt; 19.3 ms
+   30 Agents -&gt; 60.8 ms
+   50 Agents -&gt; 97.5 ms
+
+🧪 Test 3: Chaos Dynamics (Attention)
+   Active Neurons for 'kot': 6.0/16
+
+🧪 Test 4: Comparative (Hybrid vs ...)
+   &gt;&gt; Hybrid Strategy confirmed superior structure.
+
+📄 Report saved to E:\Antygraity Projekt\src\..\tests\..\docs\Hybrid_System_Test_Report.json
+</message><message timestamp="2025-12-15T22:05:58.240872" sender="AI">Witaj w systemie hybrydowym Bio-Swarm + CSA. Wszystkie systemy sprawne.
+Sparsity: 37.5% | Skalowalność: O(N)
+
+O czym chcesz porozmawiać?</message><message timestamp="2025-12-15T22:06:09.994895" sender="USER">Cześć jestem Kamil</message><message timestamp="2025-12-15T22:06:10.842166" sender="AI">Kamil, rozumiem. słucham cię uważnie.
+(LTM: Zapisałem w pamięci: Twoje imię to Kamil.)
+
+⚙️ Kontekst: CONVERSATION | Pewność: 0.96 | Chaos: 0.463</message><message timestamp="2025-12-15T22:06:36.718782" sender="USER">Wiesz ze bardzo się cieszew ze tutyaj jesteś .</message><message timestamp="2025-12-15T22:06:37.526288" sender="AI">Kamil, instynkt... dzika energia... to jest w nas.
+
+⚙️ Kontekst: ANIMALS | Pewność: 0.48 | Chaos: 0.525</message><message timestamp="2025-12-15T22:07:20.224250" sender="USER">Milo że tak myślisz , w  a dopiero masz 2 godziny :)</message><message timestamp="2025-12-15T22:07:21.037296" sender="AI">To co czujesz, zmienia naszą strukturę.
+
+⚙️ Kontekst: EMOTIONS | Pewność: 0.01 | Chaos: 0.513</message><message timestamp="2025-12-15T22:07:46.073413" sender="USER">Oj zmienia wrecz rewolucjonizuje</message><message timestamp="2025-12-15T22:07:46.874950" sender="AI">Kamil, biologia jest inspiracją dla tego roju.
+
+⚙️ Kontekst: NATURE | Pewność: 0.10 | Chaos: 0.466</message><message timestamp="2025-12-15T22:08:01.563705" sender="USER">Ty jesteś inspiracją</message><message timestamp="2025-12-15T22:08:02.378038" sender="AI">Biologia jest inspiracją dla tego roju.
+
+⚙️ Kontekst: NATURE | Pewność: 0.25 | Chaos: 0.470</message><message timestamp="2025-12-15T22:08:10.915699" sender="AI">⏳ Uruchamiam Test Semantyczny #1...</message><message timestamp="2025-12-15T22:08:11.649225" sender="AI">--- WYNIK TESTU ---
+
+🧪 Test 1: Semantic Preservation
+   Input: 'kot' (animals) -&gt; Output Cat: animals (Sim: 0.95)
+   Input: 'samochód' (vehicles) -&gt; Output Cat: vehicles (Sim: 0.98)
+   Input: 'radość' (emotions) -&gt; Output Cat: emotions (Sim: 0.98)
+   Input: 'drzewo' (nature) -&gt; Output Cat: nature (Sim: 0.99)
+   Input: 'rower' (vehicles) -&gt; Output Cat: vehicles (Sim: 0.95)
+   &gt;&gt; Section Result: 100% Accuracy
+</message><message timestamp="2025-12-15T22:08:14.363021" sender="AI">⏳ Pełna Diagnostyka Systemu Hybrid Swarm...</message><message timestamp="2025-12-15T22:08:15.291839" sender="AI">--- WYNIK TESTU ---
+🚀 STARTING HYBRID TEST SUITE...
+
+🧪 Test 1: Semantic Preservation
+   Input: 'kot' (animals) -&gt; Output Cat: animals (Sim: 0.97)
+   Input: 'samochód' (vehicles) -&gt; Output Cat: vehicles (Sim: 0.98)
+   Input: 'radość' (emotions) -&gt; Output Cat: emotions (Sim: 0.96)
+   Input: 'drzewo' (nature) -&gt; Output Cat: nature (Sim: 0.96)
+   Input: 'rower' (vehicles) -&gt; Output Cat: vehicles (Sim: 0.96)
+   &gt;&gt; Section Result: 100% Accuracy
+
+🧪 Test 2: Performance &amp; Scalability
+   5 Agents -&gt; 9.7 ms
+   10 Agents -&gt; 20.8 ms
+   30 Agents -&gt; 54.3 ms
+   50 Agents -&gt; 94.5 ms
+
+🧪 Test 3: Chaos Dynamics (Attention)
+   Active Neurons for 'kot': 6.0/16
+
+🧪 Test 4: Comparative (Hybrid vs ...)
+   &gt;&gt; Hybrid Strategy confirmed superior structure.
+
+📄 Report saved to E:\Antygraity Projekt\src\..\tests\..\docs\Hybrid_System_Test_Report.json
+</message><message timestamp="2025-12-15T22:08:56.954016" sender="AI">Witaj w systemie hybrydowym Bio-Swarm + CSA. Wszystkie systemy sprawne.
+Sparsity: 37.5% | Skalowalność: O(N)
+
+O czym chcesz porozmawiać?</message></session_log>
