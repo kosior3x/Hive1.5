@@ -190,12 +190,12 @@ class SwarmConfig:
     NN_HIDDEN_1: int = 32               # pierwsza warstwa ukryta (82 -> 32)
     NN_HIDDEN_2: int = 16               # druga warstwa ukryta (32 -> 16)
     NN_ACTIVATION: str = "relu"         # "relu" lub "tanh"
-    NN_LEARNING_RATE: float = 0.0005
+    NN_LEARNING_RATE: float = 0.0001
     NN_USE_L1_INIT: bool = True         # inicjalizuj W1 srednia z L1 (8x82)
     NN_USE_L2_INIT: bool = True         # inicjalizuj W2 srednia z L2 (8x32)
     NN_USE_A_INIT: bool = True          # inicjalizuj glowe A (jesli osobna)
     NN_USE_GATE_INIT: bool = True       # inicjalizuj glowe gate
-    NN_CLIP_GRAD: float = 5.0           # clipping gradientow
+    NN_CLIP_GRAD: float = 1.0           # clipping gradientow
 
 
     # Krystalizacja wiedzy L2 (Krok 3)
@@ -1344,10 +1344,13 @@ class NeuralBrainWithImagination:
             d_W_a = np.outer(a2, d_a)
             d_b_a = d_a
 
+            # Clip gradient
+            np.clip(d_W_a, -self.clip, self.clip, out=d_W_a)
+            np.clip(d_b_a, -self.clip, self.clip, out=d_b_a)
+
             # Update A weights
             self.W_a -= self.lr * d_W_a
             self.b_a -= self.lr * d_b_a
-            np.clip(self.W_a, -self.clip, self.clip, out=self.W_a)
 
             # Backprop through A head
             d_a_out = np.dot(d_a, self.W_a.T) # (16,)
@@ -1362,6 +1365,10 @@ class NeuralBrainWithImagination:
         d_W1 = np.outer(f, d_z1)                             # (82,32)
         d_b1 = d_z1
 
+        # Clip gradients
+        for g in [d_W_q, d_b_q, d_W2, d_b2, d_W1, d_b1]:
+             np.clip(g, -self.clip, self.clip, out=g)
+
         # Aktualizacja SGD
         self.W_q -= self.lr * d_W_q
         self.b_q -= self.lr * d_b_q
@@ -1369,10 +1376,6 @@ class NeuralBrainWithImagination:
         self.b2  -= self.lr * d_b2
         self.W1  -= self.lr * d_W1
         self.b1  -= self.lr * d_b1
-
-        # Clipping
-        for w in (self.W1, self.W2, self.W_q):
-            np.clip(w, -self.clip, self.clip, out=w)
 
     def backward_world(self, target_next_features, target_reward):
         """Aktualizacja wag modelu swiata (nie rusza warstw wspolnych)."""
@@ -1394,13 +1397,14 @@ class NeuralBrainWithImagination:
         d_W_wm1 = np.outer(x, d_z_wm1)                       # (24,16)
         d_b_wm1 = d_z_wm1
 
+        # Clip gradients
+        for g in [d_W_wm2, d_b_wm2, d_W_wm1, d_b_wm1]:
+             np.clip(g, -self.clip, self.clip, out=g)
+
         self.W_wm2 -= self.lr * d_W_wm2
         self.b_wm2 -= self.lr * d_b_wm2
         self.W_wm1 -= self.lr * d_W_wm1
         self.b_wm1 -= self.lr * d_b_wm1
-
-        np.clip(self.W_wm1, -self.clip, self.clip, out=self.W_wm1)
-        np.clip(self.W_wm2, -self.clip, self.clip, out=self.W_wm2)
 
     def generate_counterfactual(self, features, action_taken, actual_reward):
         """Zwraca (akcja, wartosc, nastepny stan) dla lepszej kontrfaktyki lub None."""
@@ -2345,6 +2349,15 @@ class SwarmCoreV55:
 
             wm_info = f"CF={self.brain.counterfactual_count}"
 
+            # Monitoring wag Q
+            if self.cycle_count % 100 == 0:
+                q_norm = np.linalg.norm(self.brain.nn.W_q)
+                if q_norm > 1000:
+                    logger.warning(f"Q norm: {q_norm:.2f} â possible explosion!")
+                if q_norm > 10000:
+                    self.brain.nn.W_q = np.random.randn(16, 8) * 0.01
+                    self.brain.nn.b_q = np.zeros(8)
+                    logger.critical("Q layer reset due to explosion")
             logger.info(
                 f"[DIAG] c={self.cycle_count} "
                 f"PWM=({pwm_l:+.0f},{pwm_r:+.0f}) "
