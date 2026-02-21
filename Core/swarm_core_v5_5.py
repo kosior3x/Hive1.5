@@ -44,11 +44,11 @@ logger = logging.getLogger('SwarmCore')
 @dataclass
 class SwarmConfig:
     """Konfiguracja SWARM v5.5 - FINAL (z poprawkami bezpieczeństwa)"""
-    
+
     # Pliki
     BRAIN_FILE: str = "brain_v5_5.pkl"
     AUTO_SAVE_INTERVAL: int = 100
-    
+
     # Fizyka robota
     ROBOT_WIDTH: float = 0.28        # szerokość obudowy [m]
     ROBOT_LENGTH: float = 0.28       # długość obudowy [m]
@@ -57,13 +57,13 @@ class SwarmConfig:
     ROBOT_HALF_WIDTH: float = 0.16   # połowa rozstawu kół
     US_FORWARD_OFFSET: float = 0.29  # odległość US od osi obrotu [m]
     MAX_SPEED_MPS: float = 0.5
-    
+
     # Dystanse (NAPRAWIONE - 10cm target)
     US_SAFETY_DIST: float = 0.12
     US_TARGET_DIST: float = 0.10
     LIDAR_SAFETY_RADIUS: float = 0.18
     LIDAR_MAX_RANGE: float = 3.0
-    
+
     SAFETY_DIST_SPEED_SCALE: float = 0.25
     SAFETY_US_MIN: float = 0.08
     SAFETY_US_MAX: float = 0.25
@@ -72,20 +72,20 @@ class SwarmConfig:
     # LIDAR hard safety — wymuszony REVERSE/TURN gdy za blisko ściany
     LIDAR_HARD_SAFETY_MIN: float = 0.25  # Lmin poniżej tej wartości = natychmiastowa reakcja
     HARD_REFLEX_HOLD_CYCLES: int = 3      # Krócej trzymaj akcję awaryjną
-    
+
     # Rear bumper
     REAR_BUMPER_FORWARD_CYCLES: int = 3  # Ile cykli FORWARD po kolizji tylnej
-    
+
     # Korekcja jazdy prostej (encoder-based)
     FORWARD_ENCODER_CORRECTION: float = 0.5  # Siła korekcji enkoderowej
     FORWARD_LORENZ_PWM: float = 2.5       # Max ±PWM szum Lorenz przy FORWARD
     FORWARD_CHAOS_DAMPEN: float = 0.0      # Chaos inject = 0 dla FORWARD
-    
+
     # Cofanie z LIDAR (NAPRAWIONE)
     REVERSE_LIDAR_CHECK: bool = True
     REVERSE_LIDAR_SECTORS: int = 4
     REVERSE_LIDAR_THRESHOLD: float = 0.15
-    
+
     # Q-Learning (v5.9)
     LEARNING_RATE: float = 0.001     # zmniejszone dla stabilności aproksymatora
     LR_DECAY: float = 0.99995        # mnożnik LR co krok (do 0.001 minimum)
@@ -94,31 +94,31 @@ class SwarmConfig:
     EPSILON: float = 0.10            # eksploracja startowa
     EPSILON_DECAY: float = 0.9999    # decay epsilon co krok
     EPSILON_MIN: float = 0.02        # minimum epsilon (zawsze trochę eksploruje)
-    
+
     # Replay Buffer
     REPLAY_BUFFER_CAPACITY: int = 7000
     REPLAY_BATCH_SIZE: int = 32
     REPLAY_TRAIN_FREQ: int = 4       # trenuj co N kroków
-    
+
     # Concept Graph (NOWE - właściwe!)
     CONCEPT_MIN_SEQUENCE: int = 3  # Min długość sekwencji dla konceptu
     CONCEPT_ACTIVATION_THRESHOLD: float = 0.6  # Próg aktywacji
     CONCEPT_DECAY_RATE: float = 0.95  # Decay per step
     CONCEPT_SUCCESS_BOOST: float = 0.3  # Boost za sukces
-    
+
     # ★ Wall proximity — blokuj koncepty FORWARD gdy za blisko
     WALL_PROXIMITY_THRESHOLD: float = 0.50  # Lmin poniżej tego = koncept FORWARD zablokowany
-    
+
     # ★ Anti-oscillation — zapobiegaj pętli REVERSE↔FORWARD
     OSCILLATION_MAX_REPEATS: int = 8  # Po tylu powtórzeniach REVERSE → wymuś SPIN
-    
+
     # PID
     PID_KP: float = 1.2
     PID_KI: float = 0.05
     PID_KD: float = 0.1
     PID_OUTPUT_SCALE: float = 400.0
     PWM_SLEW_RATE: float = 25.0
-    
+
     # Lorenz
     LORENZ_SIGMA: float = 10.0
     LORENZ_RHO: float = 28.0
@@ -126,34 +126,34 @@ class SwarmConfig:
     LORENZ_DT: float = 0.01
     LORENZ_AGGRESSION_SCALE: float = 0.25
     LORENZ_BIAS_SCALE: float = 0.03      # Lorenz dla TURN/SPIN (zmniejszone 0.05->0.03)
-    
+
     # Instinct — mocno wzmocniony, priorytet FORWARD na otwartej przestrzeni
     INSTINCT_WEIGHT: float = 3.0          # 0.8→3.0 — instynkt dominuje nad Q przy wolnej przestrzeni
     INSTINCT_REVERSE_PENALTY: float = 0.5 # Wyższy penalty dla REVERSE
     INSTINCT_US_BOOST: float = 1.2        # Mocniejszy US bias
     INSTINCT_CLEAR_THRESHOLD: float = 0.8 # Lmin > tej wartości = wyraźnie otwarta przestrzeń
     INSTINCT_CLEAR_FORWARD_BONUS: float = 8.0  # Duży bonus FORWARD gdy otwarta przestrzeń
-    
+
     # Velocity
     VELOCITY_BASE: float = 0.35
     VELOCITY_MIN_DIST: float = 0.15
     VELOCITY_MAX_DIST: float = 2.0
     VELOCITY_MIN_SPEED: float = 0.1
     VELOCITY_MAX_SPEED: float = 1.0
-    
+
     # Hysteresis
     HYSTERESIS_THRESHOLD: int = 3
     LOCK_DURATION: int = 5
-    
+
     # Anti-stagnation — okno wydłużone, próg wyższy (spin nie jest stagnacją!)
     STAGNATION_WINDOW: int = 120          # 120 cykli = 4s przy 30Hz
     STAGNATION_THRESHOLD: float = 0.03    # Wariancja pozycji [m²] — 10× wyższy
     CHAOS_INJECT_STRENGTH: float = 0.3
     STAGNATION_FORCE_TURN_CYCLES: int = 4   # Krócej wymuszać — potem niech Q decyduje
-    
+
     # PWM limits
     PWM_MAX: float = 100.0  # Hard clamp PWM
-    
+
     # Damper
     STALL_CURRENT_THRESHOLD: float = 2.5
     STALL_SPEED_THRESHOLD: float = 0.05
@@ -208,15 +208,15 @@ class Action(Enum):
 class Concept:
     """
     Koncept = WZORZEC ZACHOWANIA (sekwencja akcji)
-    
+
     NIE jest to duplikat Q-table!
-    
+
     Przykłady konceptów:
     - "tight_corner_left": [SPIN_LEFT, FORWARD, TURN_RIGHT]
     - "explore_corridor": [FORWARD, FORWARD, FORWARD]
     - "escape_deadend": [REVERSE, SPIN_LEFT, FORWARD]
     """
-    
+
     def __init__(self, name: str, sequence: List[Action]):
         self.name = name
         self.sequence = sequence  # Sekwencja akcji
@@ -225,15 +225,15 @@ class Concept:
         self.usage_count = 0  # Ile razy użyty
         self.last_used = 0  # Timestamp ostatniego użycia
         self.context: Dict[str, Any] = {}  # Kontekst (np. min_dist range)
-    
+
     def matches_context(self, current_context: Dict[str, Any]) -> float:
         """Jak dobrze pasuje do obecnego kontekstu (0-1)"""
         if not self.context:
             return 0.5  # Brak kontekstu = neutralny
-        
+
         score = 0.0
         count = 0
-        
+
         for key, value in self.context.items():
             if key in current_context:
                 # Dla wartości numerycznych - im bliżej tym lepiej
@@ -242,19 +242,19 @@ class Concept:
                     max_diff = max(abs(value), abs(current_context[key]), 0.1)
                     score += 1.0 - min(diff / max_diff, 1.0)
                     count += 1
-        
+
         return score / count if count > 0 else 0.5
-    
+
     def activate(self, boost: float = 0.1):
         """Zwiększ aktywację"""
         self.activation = min(1.0, self.activation + boost)
         self.usage_count += 1
         self.last_used = time.time()
-    
+
     def decay(self, rate: float = 0.95):
         """Zmniejsz aktywację (naturalny decay)"""
         self.activation *= rate
-    
+
     def mark_success(self, boost: float = 0.3):
         """Zaznacz sukces - zwiększ aktywację"""
         self.success_count += 1
@@ -264,22 +264,22 @@ class Concept:
 class ConceptGraph:
     """
     Graf konceptów - wzorce zachowań wysokiego poziomu
-    
+
     ★ TO NIE JEST DUPLIKAT Q-TABLE! ★
-    
+
     Q-Table: state → action (pojedyncze decyzje)
     Concepts: wzorce → sekwencje akcji (manewry)
     """
-    
+
     def __init__(self, config: SwarmConfig):
         self.config = config
         self.concepts: Dict[str, Concept] = {}
         self.action_history = deque(maxlen=10)  # Ostatnie akcje
         self.learning_buffer: List[Tuple[List[Action], bool]] = []  # (sequence, success)
-        
+
         # Predefiniowane koncepty (instynkt)
         self._init_base_concepts()
-    
+
     def _init_base_concepts(self):
         """Załaduj bazowe koncepty (instynktowne wzorce)"""
         base = [
@@ -291,73 +291,73 @@ class ConceptGraph:
             Concept("escape_back_left", [Action.REVERSE, Action.SPIN_LEFT, Action.FORWARD]),
             Concept("escape_back_right", [Action.REVERSE, Action.SPIN_RIGHT, Action.FORWARD]),
         ]
-        
+
         for c in base:
             self.concepts[c.name] = c
             c.activation = 0.3  # Startowa aktywacja
-    
+
     def update(self, action: Action, reward: float):
         """Aktualizuj graf na podstawie wykonanej akcji i nagrody"""
         self.action_history.append(action)
-        
+
         # Decay wszystkich konceptów
         for concept in self.concepts.values():
             concept.decay(self.config.CONCEPT_DECAY_RATE)
-        
+
         # Czy ostatnie N akcji pasują do jakiegoś konceptu?
         if len(self.action_history) >= self.config.CONCEPT_MIN_SEQUENCE:
             recent = list(self.action_history)[-self.config.CONCEPT_MIN_SEQUENCE:]
-            
+
             for concept in self.concepts.values():
                 # Sprawdź czy koncept pasuje do ostatnich akcji
                 if len(concept.sequence) <= len(recent):
                     if recent[-len(concept.sequence):] == concept.sequence:
                         # Pasuje! Aktywuj
                         concept.activate(0.1)
-                        
+
                         # Jeśli reward pozytywny = sukces
                         if reward > 0:
                             concept.mark_success(self.config.CONCEPT_SUCCESS_BOOST)
-        
+
         # Uczenie się nowych konceptów (jeśli buffer pełny)
         if reward > 0.5 and len(self.action_history) >= self.config.CONCEPT_MIN_SEQUENCE:
             self._try_learn_new_concept()
-    
+
     def _try_learn_new_concept(self):
         """Spróbuj nauczyć się nowego konceptu z bufora"""
         recent = list(self.action_history)[-self.config.CONCEPT_MIN_SEQUENCE:]
-        
+
         # Sprawdź czy to już znany koncept
         for concept in self.concepts.values():
             if concept.sequence == recent:
                 return  # Już znamy
-        
+
         # Nowy koncept!
         name = f"learned_{len(self.concepts)}"
         new_concept = Concept(name, recent.copy())
         new_concept.activation = 0.5  # Średnia aktywacja na start
         self.concepts[name] = new_concept
-        
+
         logger.info(f"Nauczono nowy koncept: {name} = {[a.name for a in recent]}")
-    
+
     def get_best_concept(self, context: Dict[str, Any]) -> Optional[Concept]:
         """Zwróć najbardziej aktywny koncept pasujący do kontekstu
-        
+
         ★ POPRAWKA: Blokuj koncepty FORWARD gdy za blisko ściany!
         """
         if not self.concepts:
             return None
-        
+
         min_dist = context.get('min_dist', 3.0)
         wall_proximity = self.config.WALL_PROXIMITY_THRESHOLD
-        
+
         best_concept = None
         best_score = -1.0
-        
+
         for concept in self.concepts.values():
             if concept.activation < self.config.CONCEPT_ACTIVATION_THRESHOLD:
                 continue
-            
+
             # ★ BLOKADA: Jeśli koncept polega na FORWARD a jesteśmy za blisko ściany
             if min_dist < wall_proximity:
                 # Sprawdź czy koncept głównie sugeruje jazda do przodu
@@ -365,36 +365,36 @@ class ConceptGraph:
                 if forward_count > len(concept.sequence) // 2:
                     # Zbyt dużo FORWARD w sekwencji, a ściana za blisko → zablokuj
                     continue
-            
+
             # Score = aktywacja × dopasowanie do kontekstu
             context_match = concept.matches_context(context)
             score = concept.activation * context_match
-            
+
             if score > best_score:
                 best_score = score
                 best_concept = concept
-        
+
         return best_concept
-    
+
     def get_next_action_from_concept(self, concept: Concept) -> Optional[Action]:
         """Zwróć następną akcję z sekwencji konceptu"""
         if not concept or not concept.sequence:
             return None
-        
+
         # Sprawdź gdzie jesteśmy w sekwencji
         recent = list(self.action_history)[-len(concept.sequence)+1:]
-        
+
         # Znajdź pozycję w sekwencji
         for i in range(len(concept.sequence)):
             if i < len(recent) and recent[i] != concept.sequence[i]:
                 # Nie pasuje - zacznij od początku
                 return concept.sequence[0]
-        
+
         # Kontynuuj sekwencję
         idx = len(recent)
         if idx < len(concept.sequence):
             return concept.sequence[idx]
-        
+
         # Koniec sekwencji - zacznij od początku
         return concept.sequence[0]
 
@@ -412,7 +412,7 @@ class LorenzAttractor:
         self.beta = config.LORENZ_BETA
         self.dt = config.LORENZ_DT
         self.x_norm, self.z_norm = 0.0, 0.0
-    
+
     def step(self):
         dx = self.sigma * (self.y - self.x)
         dy = self.x * (self.rho - self.z) - self.y
@@ -422,7 +422,7 @@ class LorenzAttractor:
         self.z += dz * self.dt
         self.x_norm = np.tanh(self.x / 15.0)
         self.z_norm = min(1.0, max(0.0, self.z / 40.0))
-    
+
     def get_state(self) -> Tuple[float, float, float]:
         return (self.x, self.y, self.z)
 
@@ -434,7 +434,7 @@ class LorenzAttractor:
 class FreeSpaceInstinct:
     def __init__(self, config: SwarmConfig):
         self.config = config
-    
+
     def compute_free_space_vector(self, lidar_16: np.ndarray) -> Tuple[float, float]:
         free_space = 1.0 - lidar_16
         angles = np.arange(16) * (2 * np.pi / 16)
@@ -445,7 +445,7 @@ class FreeSpaceInstinct:
             return 0.0, 0.0
         angle = math.atan2(y_sum, x_sum)
         return angle, magnitude
-    
+
     def get_bias_for_action(self, free_space_angle: float,
                             magnitude: float = 0.0,
                             front_clearance: float = 1.0,
@@ -496,7 +496,7 @@ class FreeSpaceInstinct:
             bias[Action.ESCAPE_MANEUVER] -= weight * 0.3
 
         return bias
-    
+
     def apply_us_bias(self, bias: Dict[Action, float],
                       us_left: float, us_right: float) -> Dict[Action, float]:
         us_boost = self.config.INSTINCT_US_BOOST
@@ -525,7 +525,7 @@ class DynamicVelocityMapper:
     def __init__(self, config: SwarmConfig):
         self.config = config
         self.last_target_l, self.last_target_r = 0.0, 0.0
-    
+
     def compute_base_velocity(self, min_dist: float, aggression_factor: float) -> float:
         if min_dist < self.config.VELOCITY_MIN_DIST:
             speed = self.config.VELOCITY_MIN_SPEED
@@ -538,7 +538,7 @@ class DynamicVelocityMapper:
                    ratio * (self.config.VELOCITY_MAX_SPEED - self.config.VELOCITY_MIN_SPEED)
         speed *= (1.0 + aggression_factor * 0.3)
         return speed * self.config.VELOCITY_BASE
-    
+
     def apply_ramp_limit(self, target_l: float, target_r: float) -> Tuple[float, float]:
         max_delta = 0.15
         delta_l = np.clip(target_l - self.last_target_l, -max_delta, max_delta)
@@ -554,7 +554,7 @@ class ActionStabilizer:
         self.history = deque(maxlen=config.HYSTERESIS_THRESHOLD)
         self.locked_action: Optional[Action] = None
         self.lock_remaining = 0
-    
+
     def update(self, candidate_action: Action) -> Action:
         if self.lock_remaining > 0:
             self.lock_remaining -= 1
@@ -566,7 +566,7 @@ class ActionStabilizer:
                 self.lock_remaining = self.config.LOCK_DURATION
                 return self.locked_action
         return candidate_action
-    
+
     def force_unlock(self):
         self.history.clear()
         self.locked_action = None
@@ -580,7 +580,7 @@ class AntiStagnationController:
         self.is_stagnant = False
         self.stagnation_force_remaining = 0  # ★ Ile cykli wymuszonego skrętu zostało
         self.stagnation_direction = 1  # ★ 1=lewo, -1=prawo (zmienia się)
-    
+
     def update(self, x: float, y: float, avg_pwm: float,
                current_action: Optional['Action'] = None):
         # ★ Kluczowe: spin/turn to CELOWE działanie, nie stagnacja!
@@ -592,7 +592,7 @@ class AntiStagnationController:
         ))
         if not spinning:
             self.position_history.append((x, y))
-        
+
         if len(self.position_history) == self.config.STAGNATION_WINDOW:
             positions = np.array(self.position_history)
             variance  = np.var(positions, axis=0).sum()
@@ -603,7 +603,7 @@ class AntiStagnationController:
                 and (avg_pwm > 20)
                 and not spinning
             )
-            
+
             if self.is_stagnant and not was_stagnant:
                 self.stagnation_count = getattr(self, 'stagnation_count', 0) + 1
                 self.stagnation_force_remaining = self.config.STAGNATION_FORCE_TURN_CYCLES
@@ -611,7 +611,7 @@ class AntiStagnationController:
         elif spinning:
             # Reset stagnacji gdy robot aktywnie manewruje
             self.is_stagnant = False
-    
+
     def should_force_turn(self) -> Optional['Action']:
         """Czy stagnacja wymusza skręt? Zwraca akcję lub None."""
         if self.stagnation_force_remaining > 0:
@@ -623,7 +623,7 @@ class AntiStagnationController:
             else:
                 return Action.SPIN_RIGHT if count > 2 else Action.TURN_RIGHT
         return None
-    
+
     def inject_chaos(self, lorenz_x: float, lorenz_z: float,
                     pwm_l: float, pwm_r: float) -> Tuple[float, float]:
         # ★ Lorenz chaos ZAWSZE dziala dla TURN/SPIN — nie czeka na stagnację!
@@ -645,17 +645,17 @@ class LidarEngine:
         self.config = config
         self.sectors_16 = np.zeros(16)
         self.min_dist = config.LIDAR_MAX_RANGE
-    
+
     def process(self, lidar_points: List[Tuple[float, float]]) -> np.ndarray:
         self.sectors_16.fill(0.0)
         sector_dists = [[] for _ in range(16)]
-        
+
         for angle, dist in lidar_points:
             if dist <= 0 or dist > self.config.LIDAR_MAX_RANGE:
                 continue
             sector = int((angle % 360) / 22.5) % 16
             sector_dists[sector].append(dist)
-        
+
         self.min_dist = self.config.LIDAR_MAX_RANGE
         for i, dists in enumerate(sector_dists):
             if dists:
@@ -664,9 +664,9 @@ class LidarEngine:
                 self.sectors_16[i] = 1.0 - min(min_d / self.config.LIDAR_MAX_RANGE, 1.0)
             else:
                 self.sectors_16[i] = 0.0
-        
+
         return self.sectors_16
-    
+
     def check_front_sectors_blocked(self, threshold: float, num_sectors: int = 4) -> bool:
         """Sprawdź czy przód jest zablokowany (połowa wiązki)"""
         front_sectors = self.sectors_16[:num_sectors]
@@ -693,7 +693,7 @@ class RunningNormalizer:
         self.mean = np.zeros(n_features, dtype=np.float64)
         self.M2   = np.zeros(n_features, dtype=np.float64)
         self.n_features = n_features
-    
+
     def update(self, x: np.ndarray):
         # ★ Zabezpieczenie przed zmianą liczby cech w locie
         if x.shape[0] != self.n_features:
@@ -708,17 +708,17 @@ class RunningNormalizer:
         self.mean += delta / self.n
         delta2 = x.astype(np.float64) - self.mean
         self.M2 += delta * delta2
-    
+
     def normalize(self, x: np.ndarray) -> np.ndarray:
         if self.n < 30:           # zbieramy próbki zanim zaczniemy normalizować
             return x
         std = np.sqrt(self.M2 / (self.n - 1))
         std[std < 1e-6] = 1.0    # unikamy dzielenia przez zero
         return ((x.astype(np.float64) - self.mean) / std).astype(np.float32)
-    
+
     def get_state(self) -> dict:
         return {'n': self.n, 'mean': self.mean.tolist(), 'M2': self.M2.tolist()}
-    
+
     def set_state(self, state: dict):
         if state['n'] > 0:
             saved_mean = np.array(state['mean'])
@@ -813,14 +813,14 @@ class ReplayBuffer:
     """
     def __init__(self, capacity: int = 2000):
         self.buffer = deque(maxlen=capacity)
-    
+
     def push(self, features: np.ndarray, action: int, reward: float,
              next_features: np.ndarray, done: bool = False):
         self.buffer.append((features.copy(), action, reward, next_features.copy(), done))
-    
+
     def sample(self, batch_size: int):
         return random.sample(self.buffer, min(batch_size, len(self.buffer)))
-    
+
     def __len__(self) -> int:
         return len(self.buffer)
 
@@ -832,7 +832,7 @@ class ReplayBuffer:
 class FeatureExtractor:
     """
     Ekstraktor cech sensorycznych — wersja v5.9.3 (82 cechy)
-    
+
     Struktura:
      0–15  : surowe LIDAR (16 sektorów)
      16–22 : agregaty kierunkowe
@@ -850,13 +850,13 @@ class FeatureExtractor:
      76    : BUMPER HISTORY (decaying signal)
      77–81 : NOWE INTERAKCJE (clearance * clearance)
     """
-    
+
     def __init__(self, config: SwarmConfig):
         self.config = config
-        self.us_block_thresh    = 0.2   
+        self.us_block_thresh    = 0.2
         self.lidar_block_thresh = 0.3
         self.bumper_history     = 0.0  # Historyczny ślad uderzenia
-    
+
     def extract(self, lidar_16: np.ndarray, us_left: float, us_right: float,
                 encoder_l: float, encoder_r: float,
                 lorenz_x: float, lorenz_z: float,
@@ -867,24 +867,24 @@ class FeatureExtractor:
         Zwraca wektor 82 cech (float32).
         """
         f = []
-        
+
         # ── 0–15: Surowe LIDAR ──────────────────────────────────────────────
         f.extend(lidar_16.tolist())
-        
+
         # ── 16: min_dist ────────────────────────────────────────────────────
         f.append(min_dist)
-        
+
         # Agregaty
         front_sec = np.array([lidar_16[14], lidar_16[15], lidar_16[0], lidar_16[1]])
         right_sec = lidar_16[2:6]
         rear_sec  = lidar_16[6:10]
         left_sec  = lidar_16[10:14]
-        
+
         mean_front = float(np.mean(front_sec))
         mean_left  = float(np.mean(left_sec))
         mean_right = float(np.mean(right_sec))
         mean_rear  = float(np.mean(rear_sec))
-        
+
         # ── 17–22: Agregaty kierunkowe ───────────────────────────────────────
         f.append(mean_front)                          # 17
         f.append(mean_left)                           # 18
@@ -892,7 +892,7 @@ class FeatureExtractor:
         f.append(mean_rear)                           # 20
         f.append(mean_left - mean_right)              # 21
         f.append(1.0 if min_dist < self.lidar_block_thresh else 0.0) # 22
-        
+
         # ── 23–28: US ───────────────────────────────────────────────────────
         f.append(us_left)                             # 23
         f.append(us_right)                            # 24
@@ -901,7 +901,7 @@ class FeatureExtractor:
         f.append(us_left - us_right)                  # 26
         f.append(1.0 if us_left  < self.us_block_thresh else 0.0) # 27
         f.append(1.0 if us_right < self.us_block_thresh else 0.0) # 28
-        
+
         # ── 29–33: Enkodery ──────────────────────────────────────────────────
         avg_speed = (encoder_l + encoder_r) / 2.0
         speed_diff = encoder_l - encoder_r
@@ -910,14 +910,14 @@ class FeatureExtractor:
         f.append(avg_speed)                           # 31
         f.append(speed_diff)                          # 32
         f.append(abs(speed_diff))                     # 33
-        
+
         # ── 34–35: Lorenz ───────────────────────────────────────────────────
         f.append(lorenz_x)                            # 34
         f.append(lorenz_z)                            # 35
-        
+
         # ── 36: Rear bumper ──────────────────────────────────────────────────
         f.append(float(rear_bumper))                  # 36
-        
+
         # ── 37–43: Interakcje bazowe ────────────────────────────────────────
         f.append(us_min * min_dist)                   # 37
         f.append((1.0 if min_dist < 0.3 else 0.0) * avg_speed) # 38
@@ -926,7 +926,7 @@ class FeatureExtractor:
         f.append((mean_left - mean_right) * lorenz_x) # 41
         f.append(min_dist * avg_speed)                # 42
         f.append(us_min * avg_speed)                  # 43
-        
+
         # ── 44–59: Rozszerzone agregaty ─────────────────────────────────────
         f.append(float(np.log(min_dist + 0.01)))      # 44
         f.append(float(np.var(front_sec)))            # 45
@@ -945,10 +945,10 @@ class FeatureExtractor:
         f.append(1.0 / (us_left + 0.1))               # 57
         f.append(1.0 / (us_right + 0.1))              # 58
         f.append(avg_speed ** 2)                      # 59
-        
+
         # ── 60: Bias ────────────────────────────────────────────────────────
         f.append(1.0)                                 # 60
-        
+
         # ── 61–64: CLEARANCES (Nowe!) ───────────────────────────────────────
         front_clearance = 1.0 - mean_front
         rear_clearance  = 1.0 - mean_rear
@@ -958,12 +958,12 @@ class FeatureExtractor:
         f.append(rear_clearance)                      # 62
         f.append(left_clearance)                      # 63
         f.append(right_clearance)                     # 64
-        
+
         # ── 65–67: FREE SPACE VECTOR (Nowe!) ────────────────────────────────
         f.append(math.sin(free_angle))                # 65
         f.append(math.cos(free_angle))                # 66
         f.append(free_mag)                            # 67
-        
+
         # ── 68–75: ONE-HOT ACTION (Nowe!) ───────────────────────────────────
         action_vec = [0.0] * 8
         if last_action:
@@ -972,155 +972,111 @@ class FeatureExtractor:
             if 0 <= idx < 8:
                 action_vec[idx] = 1.0
         f.extend(action_vec)                          # 68-75
-        
+
         # ── 76: BUMPER HISTORY (Nowe!) ─────────────────────────────────────
         if rear_bumper == 1:
             self.bumper_history = 1.0
         else:
             self.bumper_history *= 0.9  # Szybki decay
         f.append(self.bumper_history)                 # 76
-        
+
         # ── 77–81: NOWE INTERAKCJE (Nowe!) ──────────────────────────────────
         f.append(front_clearance * left_clearance)    # 77 - wolny lewy narożnik
         f.append(front_clearance * right_clearance)   # 78 - wolny prawy narożnik
         f.append(rear_clearance * left_clearance)     # 79
         f.append(rear_clearance * right_clearance)    # 80
         f.append(front_clearance * avg_speed)         # 81
-        
+
         return np.array(f, dtype=np.float32)
 
 
 # =============================================================================
-# LINEAR Q-APPROXIMATOR v5.9.2  (zachowany dla kompatybilnosci wstecznej)
-# =============================================================================
-
-class NeuralBrainWithImagination:
-    def __init__(self, config: SwarmConfig, n_features: int, n_actions: int, l1_weights=None, l2_weights=None):
-        self.config = config
+class DualLinearApproximator:
+    """
+    Aproksymator liniowy z dwiema macierzami:
+    - q_weights: wartość oczekiwana („co robić”)
+    - a_weights: kara za złe doświadczenia („czego unikać”)
+    """
+    def __init__(self, n_features: int, n_actions: int,
+                 learning_rate: float = 0.01,
+                 avoidance_penalty: float = 1.0,
+                 weight_clip: float = 10.0):
         self.n_features = n_features
         self.n_actions = n_actions
-        self.lr = config.LEARNING_RATE
-        self.gamma = config.DISCOUNT_FACTOR
-        
-        self.W1 = np.random.randn(n_features, 32) * 0.1
-        self.b1 = np.zeros(32)
-        
-        self.W2 = np.random.randn(32, 16) * 0.1
-        self.b2 = np.zeros(16)
-        
-        self.W_q = np.random.randn(16, n_actions) * 0.1
-        self.b_q = np.zeros(n_actions)
-        
-        self.W_wm1 = np.random.randn(16 + n_actions, 16) * 0.1
-        self.b_wm1 = np.zeros(16)
-        
-        self.W_wm2 = np.random.randn(16, n_features + 1) * 0.1
-        self.b_wm2 = np.zeros(n_features + 1)
-        
-        self.cache = {}
-        
-    def forward_q(self, features: np.ndarray) -> np.ndarray:
-        z1 = np.dot(features, self.W1) + self.b1
-        a1 = np.maximum(0, z1)
-        z2 = np.dot(a1, self.W2) + self.b2
-        a2 = np.maximum(0, z2)
-        q = np.dot(a2, self.W_q) + self.b_q
-        self.cache['features'] = features
-        self.cache['z1'] = z1
-        self.cache['a1'] = a1
-        self.cache['z2'] = z2
-        self.cache['a2'] = a2
-        self.cache['q'] = q
-        return q
+        self.lr = learning_rate
+        self.penalty = avoidance_penalty
+        self.clip = weight_clip
 
-    def forward_world(self, action: int) -> Tuple[np.ndarray, float]:
-        a2 = self.cache['a2']
-        action_onehot = np.zeros(self.n_actions)
-        action_onehot[action] = 1.0
-        x = np.concatenate([a2, action_onehot])
-        z_wm1 = np.dot(x, self.W_wm1) + self.b_wm1
-        a_wm1 = np.maximum(0, z_wm1)
-        out = np.dot(a_wm1, self.W_wm2) + self.b_wm2
-        self.cache['x_wm'] = x
-        self.cache['z_wm1'] = z_wm1
-        self.cache['a_wm1'] = a_wm1
-        self.cache['out_wm'] = out
-        return out[:-1], float(out[-1])
+        # Inicjalizacja wag (małe wartości)
+        self.q_weights = np.random.uniform(-0.01, 0.01, (n_actions, n_features))
+        self.a_weights = np.random.uniform(-0.01, 0.01, (n_actions, n_features))
 
-    def backward_q(self, target_q: np.ndarray):
-        d_q = self.cache['q'] - target_q
-        d_a2 = np.dot(d_q, self.W_q.T)
-        d_z2 = d_a2 * (self.cache['z2'] > 0)
-        d_a1 = np.dot(d_z2, self.W2.T)
-        d_z1 = d_a1 * (self.cache['z1'] > 0)
-        
-        self.W_q -= self.lr * np.outer(self.cache['a2'], d_q)
-        self.b_q -= self.lr * d_q
-        self.W2 -= self.lr * np.outer(self.cache['a1'], d_z2)
-        self.b2 -= self.lr * d_z2
-        self.W1 -= self.lr * np.outer(self.cache['features'], d_z1)
-        self.b1 -= self.lr * d_z1
-        for w in [self.W1, self.W2, self.W_q]:
-            np.clip(w, -5, 5, out=w)
+    def predict_q(self, features: np.ndarray) -> np.ndarray:
+        """Zwraca Q-values dla wszystkich akcji (8,)"""
+        return np.dot(self.q_weights, features)
 
-    def backward_world(self, target_next_features: np.ndarray, target_reward: float):
-        target = np.concatenate([target_next_features, [target_reward]])
-        d_out = self.cache['out_wm'] - target
-        d_a_wm1 = np.dot(d_out, self.W_wm2.T)
-        d_z_wm1 = d_a_wm1 * (self.cache['z_wm1'] > 0)
-        
-        self.W_wm2 -= self.lr * np.outer(self.cache['a_wm1'], d_out)
-        self.b_wm2 -= self.lr * d_out
-        self.W_wm1 -= self.lr * np.outer(self.cache['x_wm'], d_z_wm1)
-        self.b_wm1 -= self.lr * d_z_wm1
-        for w in [self.W_wm1, self.W_wm2]:
-            np.clip(w, -5, 5, out=w)
+    def predict_a(self, features: np.ndarray) -> np.ndarray:
+        """Zwraca wartości unikania (im wyższe, tym gorzej)"""
+        return np.dot(self.a_weights, features)
 
-    def generate_counterfactual(self, features: np.ndarray, action_taken: int, actual_reward: float):
-        self.forward_q(features)
-        best_value = -np.inf
-        best_action = None
-        best_next_features = None
-        for a in range(self.n_actions):
-            if a == action_taken: continue
-            next_feat, pred_reward = self.forward_world(a)
-            cf_value = pred_reward + self.gamma * np.max(self.forward_q(next_feat))
-            if cf_value > best_value:
-                best_value = cf_value
-                best_action = a
-                best_next_features = next_feat
-        if best_value > actual_reward + getattr(self.config, 'COUNTERFACTUAL_THRESHOLD', 0.5):
-            return best_action, best_value, best_next_features
-        return None, None, None
+    def predict(self, features: np.ndarray) -> np.ndarray:
+        """
+        Łączna wartość decyzyjna = Q - penalty * A
+        Używana w decide().
+        """
+        q = self.predict_q(features)
+        a = self.predict_a(features)
+        return q - self.penalty * a
 
-class NeuralHybridBrain:
+    def update_q(self, features: np.ndarray, action: int, target_q: float):
+        """Aktualizacja macierzy Q (TD learning)"""
+        q_sa = self.predict_q(features)[action]
+        td_error = q_sa - target_q
+        self.q_weights[action] -= self.lr * td_error * features
+        np.clip(self.q_weights, -self.clip, self.clip, out=self.q_weights)
+
+    def update_a(self, features: np.ndarray, action: int, target_a: float):
+        """
+        Aktualizacja macierzy unikania.
+        target_a – pożądana wartość unikania (np. 1.0 = źle, 0.0 = dobrze)
+        """
+        a_sa = self.predict_a(features)[action]
+        td_error = a_sa - target_a
+        self.a_weights[action] -= self.lr * td_error * features
+        np.clip(self.a_weights, -self.clip, self.clip, out=self.a_weights)
+
+    def set_learning_rate(self, lr: float):
+        self.lr = lr
+
+class HybridBrain:
     def __init__(self, config: SwarmConfig, feature_extractor: FeatureExtractor):
         self.config = config
         self.feature_extractor = feature_extractor
         self.actions_list = list(Action)
         self.n_actions = len(self.actions_list)
-        
+
+        # Inicjalizacja feature extractor z dummy data zeby poznac n_features
         dummy = self.feature_extractor.extract(
             np.zeros(16), 3.0, 3.0, 0.0, 0.0, 0.0, 0.0, 0, 3.0, None, 0.0, 0.0
         )
         self.n_features = len(dummy)
-        
-        self.nn = NeuralBrainWithImagination(config, self.n_features, self.n_actions)
-        self.target_nn = copy.deepcopy(self.nn)
-        self.target_update_freq = 100
-        self.train_steps = 0
+
+        self.q_approx = DualLinearApproximator(
+            n_features=self.n_features,
+            n_actions=self.n_actions,
+            learning_rate=config.LEARNING_RATE,
+            avoidance_penalty=config.AVOIDANCE_PENALTY,   # nowy parametr
+            weight_clip=10.0
+        )
+
         self.normalizer = RunningNormalizer(self.n_features)
         self.replay_buffer = ReplayBuffer(capacity=config.REPLAY_BUFFER_CAPACITY)
-        self.batch_size = config.REPLAY_BATCH_SIZE
-        self.train_freq = config.REPLAY_TRAIN_FREQ
-        self.steps_since_train = 0
         self.epsilon = config.EPSILON
         self.lr = config.LEARNING_RATE
-        self.counterfactual_count = 0
         self.last_features = None
         self.last_action = None
-        
-        logger.info(f"NeuralHybridBrain: {self.n_features} features, hidden=[32,16], world_model=24->16->83")
+
+        logger.info(f"HybridBrain: {self.n_features} features, DualLinearApproximator")
 
     def get_features(self, lidar_16, us_left, us_right, encoder_l, encoder_r,
                      lorenz_x, lorenz_z, rear_bumper, min_dist, last_action=None,
@@ -1132,77 +1088,96 @@ class NeuralHybridBrain:
         if raw.shape[0] != self.n_features:
             self.replay_buffer.buffer.clear()
             self.n_features = raw.shape[0]
+            # Reinit approximator if features change size
+            self.q_approx = DualLinearApproximator(
+                n_features=self.n_features,
+                n_actions=self.n_actions,
+                learning_rate=self.config.LEARNING_RATE,
+                avoidance_penalty=self.config.AVOIDANCE_PENALTY,
+                weight_clip=10.0
+            )
+
         self.normalizer.update(raw)
         return self.normalizer.normalize(raw)
 
-    def is_bad_state(self, reward, source, action, lidar_min, stagnant, oscillated):
-        pass
+    def is_bad_state(self, reward: float, source: str, action: Action,
+                     lidar_min: float, stagnant: bool, oscillated: bool) -> Tuple[bool, float]:
+        """
+        Zwraca (czy złe, target_dla_unikania)
+        target może być różny w zależności od wagi zdarzenia.
+        """
+        # Kolizja / twardy odruch (ale nie gdy sam REVERSE)
+        if source in ("LIDAR_HARD_SAFETY", "HARD_REFLEX") and action != Action.REVERSE:
+            return True, 2.0   # bardzo źle
 
-    def decide(self, features: np.ndarray, instinct_bias: Dict[Action, float], concept_suggestion: Optional[Action]):
+        # Stagnacja – utknięcie (ale nie podczas celowego skrętu)
+        if stagnant and action in (Action.FORWARD, Action.REVERSE):
+            return True, 1.5
+
+        # Oscylacja – wykryta przez anti‑oscillation
+        if oscillated:
+            return True, 1.2
+
+        # Bardzo niska nagroda (np. -2.0 z VirtualDamper)
+        if reward < -1.5:
+            return True, 1.0
+
+        # Jazda do przodu zbyt blisko ściany (ale jeszcze nie kolizja)
+        if action == Action.FORWARD and lidar_min < 0.2:
+            return True, 0.8
+
+        return False, 0.0
+
+    def decide(self, features: np.ndarray, instinct_bias: Dict[Action, float],
+               concept_suggestion: Optional[Action]) -> Tuple[Action, str]:
         if random.random() < self.epsilon:
-            return random.choice(self.actions_list), "EXPLORE", np.array([0.5, 0.5])
-        
-        scores = self.nn.forward_q(features).copy()
+            return random.choice(self.actions_list), "EXPLORE"
+
+        combined_q = self.q_approx.predict(features)   # już z uwzględnieniem A
+        # (opcjonalnie możemy też dodać clipping)
+        scores = combined_q.copy()
+
         for i, action in enumerate(self.actions_list):
             scores[i] += instinct_bias.get(action, 0.0) * 4.0
-            if action == concept_suggestion: scores[i] += 1.5
-                
-        best_idx = int(np.argmax(scores))
-        return self.actions_list[best_idx], "NEURAL", np.array([1.0, 0.0])
-        
-    def update_q(self, old_features, action, reward, new_features,
-                 source, lidar_min, stagnant, oscillated, done=False, lr_scale=1.0):
-        action_idx = self.actions_list.index(action)
-        self.replay_buffer.push(old_features, action_idx, reward, new_features, done)
-        
-        self.nn.forward_q(old_features)
-        self.nn.forward_world(action_idx)
-        self.nn.backward_world(new_features, reward)
-        
-        cf_action, cf_value, cf_next = self.nn.generate_counterfactual(old_features, action_idx, reward)
-        if cf_action is not None:
-            self.replay_buffer.push(old_features, cf_action, cf_value, cf_next, done)
-            self.counterfactual_count += 1
-            
-        self.epsilon = max(self.config.EPSILON_MIN, self.epsilon * self.config.EPSILON_DECAY)
-        self.lr = max(self.config.LR_MIN, self.lr * self.config.LR_DECAY)
-        self.nn.lr = self.lr
-        
-        self.steps_since_train += 1
-        if self.steps_since_train >= self.train_freq and len(self.replay_buffer) >= self.batch_size:
-            self._train_on_batch()
-            self.steps_since_train = 0
+            if action == concept_suggestion:
+                scores[i] += 1.5
 
-    def _train_on_batch(self):
-        batch = self.replay_buffer.sample(self.batch_size)
-        for old_feat, act_idx, reward, new_feat, done in batch:
-            self.nn.forward_q(old_feat)
+        best_idx = int(np.argmax(scores))
+        return self.actions_list[best_idx], "Q_APPROX+INST+CONCEPT"
+
+    def update_q(self, old_features: np.ndarray, action: Action,
+                 reward: float, new_features: np.ndarray,
+                 source: str, lidar_min: float,
+                 stagnant: bool, oscillated: bool,
+                 done: bool = False, lr_scale=1.0):
+
+        action_idx = self.actions_list.index(action)
+
+        # Czy to złe doświadczenie?
+        is_bad, bad_target = self.is_bad_state(reward, source, action,
+                                                lidar_min, stagnant, oscillated)
+
+        if is_bad:
+            # Aktualizuj macierz unikania
+            self.q_approx.update_a(old_features, action_idx, bad_target)
+        else:
+            # Normalna aktualizacja Q (TD)
             if done:
                 target_q = reward
             else:
-                max_next_q = np.max(self.target_nn.forward_q(new_feat))
+                next_q = self.q_approx.predict_q(new_features)
+                max_next_q = float(np.max(next_q))
                 target_q = reward + self.config.DISCOUNT_FACTOR * max_next_q
-                
-            q_old = self.nn.forward_q(old_feat).copy()
-            q_old[act_idx] = target_q
-            self.nn.backward_q(q_old)
-            
-        self.train_steps += 1
-        if self.train_steps % self.target_update_freq == 0:
-            self.target_nn.W1 = self.nn.W1.copy()
-            self.target_nn.b1 = self.nn.b1.copy()
-            self.target_nn.W2 = self.nn.W2.copy()
-            self.target_nn.b2 = self.nn.b2.copy()
-            self.target_nn.W_q = self.nn.W_q.copy()
-            self.target_nn.b_q = self.nn.b_q.copy()
-            self.target_nn.W_wm1 = self.nn.W_wm1.copy()
-            self.target_nn.b_wm1 = self.nn.b_wm1.copy()
-            self.target_nn.W_wm2 = self.nn.W_wm2.copy()
-            self.target_nn.b_wm2 = self.nn.b_wm2.copy()
+            self.q_approx.update_q(old_features, action_idx, target_q)
 
-# =============================================================================
-# DC MOTOR + DAMPER (bez zmian - działają)
-# =============================================================================
+        self.epsilon = max(self.config.EPSILON_MIN, self.epsilon * self.config.EPSILON_DECAY)
+        self.lr = max(self.config.LR_MIN, self.lr * self.config.LR_DECAY)
+        self.q_approx.set_learning_rate(self.lr)
+
+        # Replay Buffer nie jest tutaj aktywnie uzywany do treningu w tym kroku,
+        # ale mozna go zachowac dla przyszlych krokow (np. World Model)
+        self.replay_buffer.push(old_features, action_idx, reward, new_features, done)
+
 class DCMotorController:
     def __init__(self, config: SwarmConfig):
         self.config = config
@@ -1210,49 +1185,49 @@ class DCMotorController:
         self.integral_l, self.integral_r = 0.0, 0.0
         self.prev_error_l, self.prev_error_r = 0.0, 0.0
         self.last_pwm_l, self.last_pwm_r = 0.0, 0.0
-    
+
     def update_pid(self, target_l: float, target_r: float,
                   encoder_l: float, encoder_r: float, dt: float) -> Tuple[float, float]:
         error_l = target_l - encoder_l
         error_r = target_r - encoder_r
-        
+
         self.integral_l += error_l * dt
         self.integral_r += error_r * dt
         self.integral_l = np.clip(self.integral_l, -5, 5)
         self.integral_r = np.clip(self.integral_r, -5, 5)
-        
+
         derivative_l = (error_l - self.prev_error_l) / dt if dt > 0 else 0.0
         derivative_r = (error_r - self.prev_error_r) / dt if dt > 0 else 0.0
-        
+
         output_l = (self.config.PID_KP * error_l +
                    self.config.PID_KI * self.integral_l +
                    self.config.PID_KD * derivative_l)
         output_r = (self.config.PID_KP * error_r +
                    self.config.PID_KI * self.integral_r +
                    self.config.PID_KD * derivative_r)
-        
+
         pwm_l = output_l * self.config.PID_OUTPUT_SCALE
         pwm_r = output_r * self.config.PID_OUTPUT_SCALE
-        
+
         delta_l = np.clip(pwm_l - self.last_pwm_l, -self.config.PWM_SLEW_RATE, self.config.PWM_SLEW_RATE)
         delta_r = np.clip(pwm_r - self.last_pwm_r, -self.config.PWM_SLEW_RATE, self.config.PWM_SLEW_RATE)
-        
+
         self.last_pwm_l += delta_l
         self.last_pwm_r += delta_r
         self.prev_error_l = error_l
         self.prev_error_r = error_r
-        
+
         # Hard clamp PWM
         self.last_pwm_l = np.clip(self.last_pwm_l, -self.config.PWM_MAX, self.config.PWM_MAX)
         self.last_pwm_r = np.clip(self.last_pwm_r, -self.config.PWM_MAX, self.config.PWM_MAX)
-        
+
         return self.last_pwm_l, self.last_pwm_r
-    
+
     def sync_memory(self, pwm_l: float, pwm_r: float):
         """Zsynchronizuj pamięć PID z zewnętrzną korekcją PWM."""
         self.last_pwm_l = pwm_l
         self.last_pwm_r = pwm_r
-    
+
     def update_odometry(self, vel_l: float, vel_r: float, dt: float):
         v = (vel_l + vel_r) / 2.0
         omega = (vel_r - vel_l) / self.config.WHEEL_BASE
@@ -1265,14 +1240,14 @@ class DCMotorController:
 class VirtualDamper:
     def __init__(self, config: SwarmConfig):
         self.config = config
-    
+
     def compute_reward(self, encoder_l: float, encoder_r: float,
                       motor_current: float, action: Action) -> float:
         avg_speed = abs((encoder_l + encoder_r) / 2.0)
-        
+
         if motor_current > self.config.STALL_CURRENT_THRESHOLD and avg_speed < self.config.STALL_SPEED_THRESHOLD:
             return -5.0
-        
+
         if action == Action.FORWARD:
             return 1.0 + avg_speed * 0.5
         elif action in (Action.TURN_LEFT, Action.TURN_RIGHT):
@@ -1289,12 +1264,12 @@ class VirtualDamper:
 
 class StateManager:
     """Zarządzanie stanem - persistence wbudowana (bez patchy!)"""
-    
+
     def __init__(self, config: SwarmConfig):
         self.config = config
         self.brain_path = Path(config.BRAIN_FILE)
         self.save_counter = 0
-    
+
     def save(self, data: Dict):
         try:
             with open(self.brain_path, 'wb') as f:
@@ -1304,7 +1279,7 @@ class StateManager:
             logger.info(f"✓ Saved: {w_info}, Concepts={len(data.get('concepts',{}))}")
         except Exception as e:
             logger.error(f"Save failed: {e}")
-    
+
     def load(self) -> Optional[Dict]:
         if not self.brain_path.exists():
             logger.info("No saved state - starting fresh")
@@ -1319,7 +1294,7 @@ class StateManager:
         except Exception as e:
             logger.error(f"Load failed: {e}")
             return None
-    
+
     def should_auto_save(self) -> bool:
         self.save_counter += 1
         if self.save_counter >= self.config.AUTO_SAVE_INTERVAL:
@@ -1335,50 +1310,50 @@ class StateManager:
 class SwarmCoreV55:
     """
     SWARM v5.5 - Production Final
-    
+
     ★ Q-Table ≠ Concept Graph!
     ★ Persistence wbudowana (bez patchy)
     ★ Android-compatible (bez relative imports)
     ★ Gotowe do unzip & run
     """
-    
+
     def __init__(self):
         self.config = SwarmConfig()
-        
+
         # Hardware
         self.lidar = LidarEngine(self.config)
         self.motors = DCMotorController(self.config)
         self.damper = VirtualDamper(self.config)
-        
+
         # Feature Extractor (v5.9)
         self.feature_extractor = FeatureExtractor(self.config)
-        
+
         # AI Layers
-        self.brain = NeuralHybridBrain(self.config, self.feature_extractor)
+        self.brain = HybridBrain(self.config, self.feature_extractor)
         self.concept_graph = ConceptGraph(self.config)  # ★ WŁAŚCIWY!
-        
+
         # Moduly
         self.lorenz = LorenzAttractor(self.config)
         self.instinct = FreeSpaceInstinct(self.config)
         self.velocity_mapper = DynamicVelocityMapper(self.config)
         self.stabilizer = ActionStabilizer(self.config)
         self.anti_stagnation = AntiStagnationController(self.config)
-        
+
         # Persistence wbudowana
         self.state_manager = StateManager(self.config)
         self._load_state()
-        
+
         self.cycle_count = 0
         self.hard_reflex_hold_remaining = 0
         self.hard_reflex_action: Optional[Action] = None
-        
+
         # Rear bumper state
         self.rear_bumper_forward_remaining = 0
-        
+
         # ★ Anti-oscillation: śledzenie powtórzeń akcji
         self._last_action_type: Optional[Action] = None
         self._action_repeat_count: int = 0
-        
+
         logger.info("=" * 70)
         logger.info("SWARM CORE v5.9 — Q-Approximator — ANDROID-READY")
         logger.info("=" * 70)
@@ -1386,27 +1361,23 @@ class SwarmCoreV55:
         logger.info(f"Concepts: {len(self.concept_graph.concepts)} patterns")
         logger.info(f"Target: {self.config.US_TARGET_DIST*100:.0f}cm")
         logger.info("=" * 70)
-    
+
     def _load_state(self):
         saved = self.state_manager.load()
         if saved:
-            if 'nn_W1' in saved:
+            if 'q_weights' in saved and saved['q_weights'] is not None:
                 try:
-                    self.brain.nn.W1 = np.array(saved['nn_W1'])
-                    self.brain.nn.b1 = np.array(saved['nn_b1'])
-                    self.brain.nn.W2 = np.array(saved['nn_W2'])
-                    self.brain.nn.b2 = np.array(saved['nn_b2'])
-                    self.brain.nn.W_q = np.array(saved['nn_W_q'])
-                    self.brain.nn.b_q = np.array(saved['nn_b_q'])
-                    self.brain.nn.W_wm1 = np.array(saved['nn_W_wm1'])
-                    self.brain.nn.b_wm1 = np.array(saved['nn_b_wm1'])
-                    self.brain.nn.W_wm2 = np.array(saved['nn_W_wm2'])
-                    self.brain.nn.b_wm2 = np.array(saved['nn_b_wm2'])
-                    self.brain.counterfactual_count = saved.get('counterfactual_count', 0)
-                    logger.info("Neural network loaded")
+                    self.brain.q_approx.q_weights = np.array(saved['q_weights'])
+                    if 'a_weights' in saved and saved['a_weights'] is not None:
+                        self.brain.q_approx.a_weights = np.array(saved['a_weights'])
+                    else:
+                        self.brain.q_approx.a_weights = np.zeros_like(self.brain.q_approx.q_weights)
+                    logger.info("Brain weights loaded (Q+A)")
                 except Exception as e:
-                    logger.error(f"Failed to load neural network weights: {e}")
-                    
+                    logger.error(f"Failed to load brain weights: {e}")
+            elif 'nn_W1' in saved:
+                 logger.warning("Found old Neural Network weights - ignoring/resetting to DualLinear")
+
             norm_state = saved.get('normalizer_state')
             if norm_state and norm_state.get('n', 0) > 0:
                 saved_mean = np.array(norm_state['mean'])
@@ -1418,7 +1389,7 @@ class SwarmCoreV55:
 
             self.brain.epsilon = saved.get('epsilon', self.config.EPSILON)
             self.brain.lr      = saved.get('lr', self.config.LEARNING_RATE)
-            self.brain.nn.lr   = self.brain.lr
+            self.brain.q_approx.set_learning_rate(self.brain.lr)
 
             saved_concepts = saved.get('concepts', {})
             if saved_concepts:
@@ -1447,25 +1418,15 @@ class SwarmCoreV55:
             }
 
         data = {
-            'nn_W1': self.brain.nn.W1.tolist(),
-            'nn_b1': self.brain.nn.b1.tolist(),
-            'nn_W2': self.brain.nn.W2.tolist(),
-            'nn_b2': self.brain.nn.b2.tolist(),
-            'nn_W_q': self.brain.nn.W_q.tolist(),
-            'nn_b_q': self.brain.nn.b_q.tolist(),
-            'nn_W_wm1': self.brain.nn.W_wm1.tolist(),
-            'nn_b_wm1': self.brain.nn.b_wm1.tolist(),
-            'nn_W_wm2': self.brain.nn.W_wm2.tolist(),
-            'nn_b_wm2': self.brain.nn.b_wm2.tolist(),
+            'q_weights': self.brain.q_approx.q_weights.tolist(),
+            'a_weights': self.brain.q_approx.a_weights.tolist(),
             'normalizer_state': self.brain.normalizer.get_state(),
             'epsilon':          self.brain.epsilon,
             'lr':               self.brain.lr,
             'concepts':         concepts_data,
             'lorenz_state':     self.lorenz.get_state(),
-            'counterfactual_count': self.brain.counterfactual_count,
         }
         self.state_manager.save(data)
-    
     def _compute_dynamic_safety(self, avg_speed: float) -> Tuple[float, float]:
         scale = self.config.SAFETY_DIST_SPEED_SCALE
         v = abs(avg_speed)
@@ -1474,14 +1435,14 @@ class SwarmCoreV55:
         lr = self.config.LIDAR_SAFETY_RADIUS + (scale * v)
         lr = max(self.config.SAFETY_LIDAR_MIN, min(self.config.SAFETY_LIDAR_MAX, lr))
         return us, lr
-    
+
     def validate_safety_constraints(self, us_left_dist: float, us_right_dist: float,
                                    encoder_l: float, encoder_r: float,
                                    rear_bumper: int = 0) -> Optional[Tuple[Action, str]]:
         """Safety check z dual US + LIDAR + rear bumper + LIDAR hard safety"""
         avg_speed = (encoder_l + encoder_r) / 2.0
         dyn_us, _dyn_lidar = self._compute_dynamic_safety(avg_speed)
-        
+
         # ────────────────────────────────────────────────────────────────────
         # LIDAR hard safety — PRIORYTET 1 (niezależnie od bumpera!)
         # Gdy Lmin < 0.25m ZAWSZE uciekaj — przebija bumper!
@@ -1510,21 +1471,21 @@ class SwarmCoreV55:
                     self.hard_reflex_action = Action.REVERSE
             self.hard_reflex_hold_remaining = self.config.HARD_REFLEX_HOLD_CYCLES
             return self.hard_reflex_action, "LIDAR_HARD_SAFETY"
-        
+
         # ────────────────────────────────────────────────────────────────────
         # HARD REFLEX HOLD — trzymaj poprzednią akcję ratunkową
         # ────────────────────────────────────────────────────────────────────
         if self.hard_reflex_hold_remaining > 0 and self.hard_reflex_action is not None:
             self.hard_reflex_hold_remaining -= 1
             return self.hard_reflex_action, "HARD_REFLEX_HOLD"
-        
+
         # ★ NOWE: Jeśli aktualna akcja to już TURN/SPIN, a Lmin nie jest jeszcze krytyczne (<0.18m)
         #   ale powyżej 0.15m, to pozwól Q-aproksymatorowi kontynuować manewr.
         if (self._last_action_type in (Action.TURN_LEFT, Action.TURN_RIGHT,
                                        Action.SPIN_LEFT, Action.SPIN_RIGHT)
                 and self.lidar.min_dist > 0.15):
             return None  # safety nie ingeruje w aktywny skręt
-        
+
         # ────────────────────────────────────────────────────────────────────
         # REAR BUMPER: tylna kolizja → uciekaj DO PRZODU jeśli można
         # Jeśli przód zablokowany → SPIN zamiast FORWARD (unikamy pętli!)
@@ -1537,7 +1498,7 @@ class SwarmCoreV55:
                 self.lidar.sectors_16[0],  self.lidar.sectors_16[1]
             ])
             front_clear = float(np.max(front_sectors)) < 0.5  # 0.5 = ~1.5m odległości
-            
+
             if front_clear:
                 # Przód wolny → jedź do przodu
                 self.rear_bumper_forward_remaining = self.config.REAR_BUMPER_FORWARD_CYCLES
@@ -1554,7 +1515,7 @@ class SwarmCoreV55:
                 self.hard_reflex_hold_remaining = self.config.HARD_REFLEX_HOLD_CYCLES
                 logger.warning(f"REAR BUMPER: front blocked -> {spin_action.name}")
                 return spin_action, "REAR_BUMPER_SPIN"
-        
+
         # Kontynuuj wymuszony FORWARD po tylnej kolizji
         # (ale przerwij jeśli LIDAR ostrzega z przodu!)
         if self.rear_bumper_forward_remaining > 0:
@@ -1569,12 +1530,12 @@ class SwarmCoreV55:
             else:
                 self.rear_bumper_forward_remaining -= 1
                 return Action.FORWARD, "REAR_BUMPER_FORWARD"
-        
+
         # ────────────────────────────────────────────────────────────────────
         # US front check + LIDAR corroboration
         # ────────────────────────────────────────────────────────────────────
         us_front_min = min(us_left_dist, us_right_dist)
-        
+
         # ★ NAPRAWIONE: Sprawdź LIDAR przed cofnięciem
         if 0.01 < us_front_min < dyn_us:
             if self.config.REVERSE_LIDAR_CHECK:
@@ -1584,13 +1545,13 @@ class SwarmCoreV55:
                 )
                 if not front_blocked:
                     return None  # Bok wolny - nie cofaj!
-            
+
             # Przód zablokowany → cofnij
             self.stabilizer.force_unlock()
             self.hard_reflex_action = Action.REVERSE
             self.hard_reflex_hold_remaining = self.config.HARD_REFLEX_HOLD_CYCLES
             return Action.REVERSE, "HARD_REFLEX"
-        
+
         # Anti-stall
         if (abs(encoder_l) < 0.02 and abs(encoder_r) < 0.02 and
                 abs(self.motors.last_pwm_l) > 40 and abs(self.motors.last_pwm_r) > 40):
@@ -1598,44 +1559,44 @@ class SwarmCoreV55:
             self.hard_reflex_action = Action.ESCAPE_MANEUVER
             self.hard_reflex_hold_remaining = self.config.HARD_REFLEX_HOLD_CYCLES
             return Action.ESCAPE_MANEUVER, "ANTI_STALL"
-        
+
         return None
-    
+
     def loop(self, lidar_points: List[Tuple[float, float]],
              encoder_l: float, encoder_r: float,
-             motor_current: float, 
+             motor_current: float,
              us_left_dist: float = 3.0, us_right_dist: float = 3.0,
              rear_bumper: int = 0,
              dt: float = 0.033) -> Tuple[float, float]:
         """Główna pętla decyzyjna (v5.5 - dual US + rear bumper)"""
-        
+
         self.cycle_count += 1
         us_front_min = min(us_left_dist, us_right_dist)
-        
+
         # 1. Process sensors
         lidar_16 = self.lidar.process(lidar_points)
         avg_speed = (encoder_l + encoder_r) / 2.0
         dyn_us, dyn_lidar = self._compute_dynamic_safety(avg_speed)
-        
+
         # 2. Safety check (dual US + rear bumper)
         safety_override = self.validate_safety_constraints(
             us_left_dist, us_right_dist, encoder_l, encoder_r, rear_bumper)
-        
+
         # 3. Lorenz step
         self.lorenz.step()
         aggression_factor = self.lorenz.z_norm
         directional_bias = self.lorenz.x_norm
-        
+
         # 4. Free space instinct (WZMOCNIONY z USL/USR + front sektory)
         free_angle, free_mag = self.instinct.compute_free_space_vector(lidar_16)
-        
+
         # ★ front_clearance: średnia wolności przednich sektorów (14,15,0,1 = ±45° od 0°)
         #   lidar_16[i] = 1-dist/max → HIGH=przeszkoda, LOW=wolno
         #   front_clearance 1.0 = czysto z przodu, 0.0 = ściana wprost
         front_occ     = float(np.mean([lidar_16[14], lidar_16[15],
                                        lidar_16[0],  lidar_16[1]]))
         front_clearance = 1.0 - front_occ   # odwróć: 1=wolno, 0=ściana
-        
+
         instinct_bias = self.instinct.get_bias_for_action(
             free_angle,
             magnitude=free_mag,
@@ -1644,7 +1605,7 @@ class SwarmCoreV55:
             us_right=us_right_dist
         )
         instinct_bias = self.instinct.apply_us_bias(instinct_bias, us_left_dist, us_right_dist)
-        
+
         # 5. Feature extraction (v5.9.3 — rozszerzony wektor)
         features = self.brain.get_features(
             lidar_16, us_left_dist, us_right_dist,
@@ -1653,7 +1614,7 @@ class SwarmCoreV55:
             rear_bumper, self.lidar.min_dist,
             last_action=self._last_action_type,
             free_angle=free_angle, free_mag=free_mag)
-        
+
         # 6. ★ Concept Graph - sugestia akcji
         context = {'min_dist': self.lidar.min_dist, 'us_left': us_left_dist, 'us_right': us_right_dist}
         best_concept = self.concept_graph.get_best_concept(context)
@@ -1666,10 +1627,10 @@ class SwarmCoreV55:
                     f"(aktywacja={best_concept.activation:.2f}) "
                     f"→ sugestia: {concept_suggestion.name if concept_suggestion else 'None'}"
                 )
-        
+
         # 7. Decision (Q + Instinct + Concept!)
         collision = (us_front_min < dyn_us) or (self.lidar.min_dist < dyn_lidar)
-        
+
         gate_weights = np.array([0.5, 0.5], dtype=np.float32)
 
         if safety_override:
@@ -1682,16 +1643,16 @@ class SwarmCoreV55:
                 source = "STAGNATION_FORCE"
                 self.stabilizer.force_unlock()
             else:
-                action_candidate, source, gate_weights = self.brain.decide(features, instinct_bias, concept_suggestion)
+                action_candidate, source = self.brain.decide(features, instinct_bias, concept_suggestion)
                 final_action = self.stabilizer.update(action_candidate)
-        
+
         # ★ NOWE: Anti-oscillation — wykryj pętlę REVERSE↔FORWARD
         if final_action == self._last_action_type:
             self._action_repeat_count += 1
         else:
             self._action_repeat_count = 0
             self._last_action_type = final_action
-        
+
         # Jesli za duzo powtorzen REVERSE — wymus SPIN (bez hard_reflex, uzyj stagnation hold)
         if (final_action == Action.REVERSE and
             source not in ("HARD_REFLEX", "HARD_REFLEX_HOLD", "LIDAR_HARD_SAFETY") and
@@ -1706,7 +1667,7 @@ class SwarmCoreV55:
             self.anti_stagnation.stagnation_force_remaining = 6
             self.anti_stagnation.stagnation_direction = 1 if spin == Action.SPIN_LEFT else -1
             logger.info(f"[ANTI-OSC] 8x REVERSE & STAGNANT -> {spin.name} (6 cycles)")
-        
+
         # ★ BEZPIECZNIK: jesli front zablokowany (clr<0.40) a akcja = FORWARD -> skret!
         if (final_action == Action.FORWARD and front_clearance < 0.40
                 and source not in ("HARD_REFLEX", "HARD_REFLEX_HOLD", "REAR_BUMPER_HIT",
@@ -1718,15 +1679,15 @@ class SwarmCoreV55:
                 final_action = Action.TURN_RIGHT
             source = "FRONT_BLOCKED_TURN"
             self.stabilizer.force_unlock()
-        
+
         # 8. Reward (★ z karą za bliskość ściany przy FORWARD)
         reward = self.damper.compute_reward(encoder_l, encoder_r, motor_current, final_action)
-        
+
         # ★ NOWE: Kara za FORWARD blisko ściany — uczy Q-table żeby nie jechać w ścianę
         if final_action == Action.FORWARD and self.lidar.min_dist < 0.35:
             proximity_penalty = -2.0 * (1.0 - self.lidar.min_dist / 0.35)
             reward += proximity_penalty
-        
+
         # 9. Q-Update v5.10 — Avoidance Layer
         #    Uczenie ZAWSZE (nawet na wymuszonych akcjach):
         #    - zle doswiadczenia  -> macierz A (unikanie)
@@ -1749,16 +1710,16 @@ class SwarmCoreV55:
                 lr_scale=1.0
             )
 
-        
+
         # 10. ★ Concept Graph Update
         self.concept_graph.update(final_action, reward)
-        
+
         # 11. Velocity mapping
         # Dla FORWARD: usyj front_clearance (odl. z przodu) nie globalny min_dist (moze byc sciana z tylu!)
         front_dist_est = front_clearance * self.config.LIDAR_MAX_RANGE
         fwd_velocity   = self.velocity_mapper.compute_base_velocity(front_dist_est, aggression_factor)
         base_velocity  = self.velocity_mapper.compute_base_velocity(self.lidar.min_dist, aggression_factor)
-        
+
         # 12. Action → Target velocities
         if final_action == Action.FORWARD:
             target_l, target_r = fwd_velocity, fwd_velocity  # predkosc bazuje na front_dist!
@@ -1776,7 +1737,7 @@ class SwarmCoreV55:
             target_l, target_r = base_velocity * 0.5, -base_velocity * 0.5
         else:
             target_l, target_r = 0.0, 0.0
-        
+
         # 13. Lorenz bias — delikatny dla TURN/SPIN, zero na velocity dla FORWARD
         #     FORWARD dostaje mikro-szum dopiero na poziomie PWM (krok 19b)
         if final_action in (Action.TURN_LEFT, Action.TURN_RIGHT,
@@ -1784,32 +1745,32 @@ class SwarmCoreV55:
             bias_strength = self.config.LORENZ_BIAS_SCALE
             target_l += directional_bias * bias_strength
             target_r -= directional_bias * bias_strength
-        
+
         # 14. Ramp limiter
         target_l, target_r = self.velocity_mapper.apply_ramp_limit(target_l, target_r)
-        
+
         # 15. Enforce symmetry dla REVERSE
         if final_action == Action.REVERSE:
             symmetric = (target_l + target_r) / 2.0
             target_l, target_r = symmetric, symmetric
-        
+
         if final_action == Action.ESCAPE_MANEUVER:
             mag = min(abs(target_l), abs(target_r))
             target_l, target_r = mag, -mag
-        
+
         # 16. Update memory (v5.9 — features zamiast hash)
         self.brain.last_features = features
         self.brain.last_action = final_action
-        
+
         # 17. PID control
         pwm_l, pwm_r = self.motors.update_pid(target_l, target_r, encoder_l, encoder_r, dt)
-        
+
         # 18. Enforce PWM symmetry dla REVERSE
         if final_action == Action.REVERSE:
             symmetric_pwm = -abs((pwm_l + pwm_r) / 2.0)
             pwm_l, pwm_r = symmetric_pwm, symmetric_pwm
             self.motors.sync_memory(pwm_l, pwm_r)
-        
+
         # 19. Anti-stagnation — chaos TYLKO dla TURN/SPIN
         avg_pwm = (abs(pwm_l) + abs(pwm_r)) / 2.0
         # Przekaż aktualną akcję — spin/turn NIE jest stagnacją!
@@ -1820,50 +1781,50 @@ class SwarmCoreV55:
             pwm_l, pwm_r = self.anti_stagnation.inject_chaos(
                 self.lorenz.x_norm, self.lorenz.z_norm, pwm_l, pwm_r
             )
-        
+
         # ★ NOWE: Hard clamp PWM po chaos injection — zapobiega eksplozji PWM (±300+)
         pwm_l = np.clip(pwm_l, -self.config.PWM_MAX, self.config.PWM_MAX)
         pwm_r = np.clip(pwm_r, -self.config.PWM_MAX, self.config.PWM_MAX)
-        
+
         # 19b. ★ FORWARD: symetria + mikro-szum Lorenz (±1-3 PWM)
         if final_action == Action.FORWARD:
             # Krok 1: Wymuszaj symetrię bazową
             avg_pwm_fwd = (pwm_l + pwm_r) / 2.0
-            
+
             # Krok 2: Mikro-szum Lorenz (±1-3 PWM — naturalny dryf)
             micro_noise = directional_bias * self.config.FORWARD_LORENZ_PWM
-            
+
             # Krok 3: Korekcja enkoderowa
             encoder_diff = encoder_l - encoder_r
             encoder_corr = 0.0
             if abs(encoder_diff) > 0.005:
                 encoder_corr = encoder_diff * 20.0
-            
+
             pwm_l = avg_pwm_fwd + micro_noise - encoder_corr
             pwm_r = avg_pwm_fwd - micro_noise + encoder_corr
-            
+
             # ★ KRYTYCZNE: Zsynchronizuj pamięć PID!
             self.motors.sync_memory(pwm_l, pwm_r)
-        
+
         # 20. Odometry
         self.motors.update_odometry(encoder_l, encoder_r, dt)
-        
+
         # 21. ★ Auto-save (wbudowane!)
         if self.state_manager.should_auto_save():
             self.save_state()
-        
+
         # 22. Pelna diagnostyka co 50 cykli
         if self.cycle_count % 50 == 0:
             lorenz_info = f"Lx={directional_bias:+.2f} Lz={aggression_factor:.2f}"
             free_info   = (f"front_clr={front_clearance:.2f} "
                            f"free_ang={math.degrees(free_angle):+.0f}deg mag={free_mag:.2f}")
             stag_info   = "STAGNANT!" if self.anti_stagnation.is_stagnant else "ok"
-            q_vals      = self.brain.nn.cache.get('q', np.zeros(8))
+            q_vals      = self.brain.q_approx.predict_q(features)
             q_info      = (f"Q=[{np.min(q_vals):+.2f},{np.max(q_vals):+.2f}] "
                            f"Qnrm={np.linalg.norm(q_vals):.1f} "
                            f"eps={self.brain.epsilon:.3f} lr={self.brain.lr:.5f} "
                            f"buf={len(self.brain.replay_buffer)}")
-            wm_info = f"CF={self.brain.counterfactual_count}"
+            wm_info = "CF=N/A"
 
             logger.info(
                 f"[DIAG] c={self.cycle_count} "
@@ -1874,18 +1835,19 @@ class SwarmCoreV55:
                 f"{lorenz_info} {free_info} stag={stag_info} "
                 f"{q_info} {wm_info}"
             )
-        
-        
+
+
         # ★★★ FINAL SAFETY CLAMP — zawsze na końcu, bez wyjątków!
         pwm_l = np.clip(pwm_l, -self.config.PWM_MAX, self.config.PWM_MAX)
         pwm_r = np.clip(pwm_r, -self.config.PWM_MAX, self.config.PWM_MAX)
-        
+
         return pwm_l, pwm_r
-    
+
     def get_stats(self) -> Dict:
         return {
             'cycle_count':       self.cycle_count,
-            'q_weights_norm':    float(np.linalg.norm(self.brain.nn.W_q)),
+            'q_weights_norm':    float(np.linalg.norm(self.brain.q_approx.q_weights)),
+            'a_weights_norm':    float(np.linalg.norm(self.brain.q_approx.a_weights)),
             'epsilon':           self.brain.epsilon,
             'lr':                self.brain.lr,
             'replay_size':       len(self.brain.replay_buffer),
@@ -1894,7 +1856,6 @@ class SwarmCoreV55:
             'lorenz_state':      self.lorenz.get_state(),
             'position':          (self.motors.x, self.motors.y, self.motors.theta),
             'stagnant':          self.anti_stagnation.is_stagnant,
-            'counterfactual_generated': getattr(self.brain, 'counterfactual_count', 0),
         }
 
 
@@ -1908,13 +1869,13 @@ SwarmCoreV54 = SwarmCoreV55
 
 if __name__ == "__main__":
     print("\n" + "=" * 70)
-    print("SWARM CORE v5.14 -- NEURAL BRAIN -- TEST")
+    print("SWARM CORE v5.14 -- DUAL LINEAR BRAIN -- TEST")
     print("=" * 70 + "\n")
-    
+
     cfg = SwarmConfig()
     core = SwarmCoreV55()
-    
-    print("[INTEG] SwarmCoreV55 Neural -- 20 krokow ...")
+
+    print("[INTEG] SwarmCoreV55 DualLinear -- 20 krokow ...")
     for i in range(20):
         # Symulacja
         pwm_l, pwm_r = core.loop(
