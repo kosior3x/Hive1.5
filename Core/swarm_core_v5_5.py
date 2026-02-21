@@ -186,6 +186,17 @@ class SwarmConfig:
     COUNTERFACTUAL_THRESHOLD: float = 0.5  # prog poprawy, by dodac kontrfaktyke
     COUNTERFACTUAL_LR: float = 0.1         # jak bardzo kontrfaktyka wplywa na Q (waga)
 
+    # Neural Network (Krok 6)
+    NN_HIDDEN_1: int = 32               # pierwsza warstwa ukryta (82 -> 32)
+    NN_HIDDEN_2: int = 16               # druga warstwa ukryta (32 -> 16)
+    NN_ACTIVATION: str = "relu"         # "relu" lub "tanh"
+    NN_LEARNING_RATE: float = 0.0005
+    NN_USE_L1_INIT: bool = True         # inicjalizuj W1 srednia z L1 (8x82)
+    NN_USE_L2_INIT: bool = True         # inicjalizuj W2 srednia z L2 (8x32)
+    NN_USE_A_INIT: bool = True          # inicjalizuj glowe A (jesli osobna)
+    NN_USE_GATE_INIT: bool = True       # inicjalizuj glowe gate
+    NN_CLIP_GRAD: float = 5.0           # clipping gradientow
+
     # Krystalizacja wiedzy L2 (Krok 3)
     L2_FEATURES: int = 32                # liczba cech w warstwie L2
     L2_MIN_SAMPLES: int = 5000           # minimalna liczba krokow przed krystalizacja
@@ -209,6 +220,17 @@ class SwarmConfig:
     COUNTERFACTUAL_STEPS: int = 3          # nieuzywane aktywnie w krok. 5, zostawiamy jako koncepcje
     COUNTERFACTUAL_THRESHOLD: float = 0.5  # prog poprawy, by dodac kontrfaktyke
     COUNTERFACTUAL_LR: float = 0.1         # jak bardzo kontrfaktyka wplywa na Q (waga)
+
+    # Neural Network (Krok 6)
+    NN_HIDDEN_1: int = 32               # pierwsza warstwa ukryta (82 -> 32)
+    NN_HIDDEN_2: int = 16               # druga warstwa ukryta (32 -> 16)
+    NN_ACTIVATION: str = "relu"         # "relu" lub "tanh"
+    NN_LEARNING_RATE: float = 0.0005
+    NN_USE_L1_INIT: bool = True         # inicjalizuj W1 srednia z L1 (8x82)
+    NN_USE_L2_INIT: bool = True         # inicjalizuj W2 srednia z L2 (8x32)
+    NN_USE_A_INIT: bool = True          # inicjalizuj glowe A (jesli osobna)
+    NN_USE_GATE_INIT: bool = True       # inicjalizuj glowe gate
+    NN_CLIP_GRAD: float = 5.0           # clipping gradientow
 
     # Bramka meta-warstwy (Krok 4)
     GATE_FEATURES: int = 16              # liczba cech wejsciowych bramki
@@ -1234,7 +1256,222 @@ class WorldModelBuffer:
     def __len__(self):
         return len(self.buffer)
 
-class HybridBrain:
+class NeuralBrainWithImagination:
+    def __init__(self, config: SwarmConfig, n_features: int = 82, n_actions: int = 8,
+                 l1_weights=None, l2_weights=None, a_weights=None, gate_weights=None):
+        self.config = config
+        self.n_features = n_features
+        self.n_actions = n_actions
+        self.lr = config.NN_LEARNING_RATE
+        self.gamma = config.DISCOUNT_FACTOR
+        self.clip = config.NN_CLIP_GRAD
+
+        # ---- Warstwy wspolne ----
+        # W1: (82, 32) – inicjalizacja z L1 (srednia po akcjach)
+        if l1_weights is not None and config.NN_USE_L1_INIT:
+            l1_mean = np.mean(l1_weights, axis=0)          # (82,)
+            self.W1 = np.tile(l1_mean.reshape(-1,1), (1, config.NN_HIDDEN_1)) * 0.1
+        else:
+            self.W1 = np.random.randn(n_features, config.NN_HIDDEN_1) * 0.1
+        self.b1 = np.zeros(config.NN_HIDDEN_1)
+
+        # W2: (32, 16) – inicjalizacja z L2 (srednia po akcjach)
+        if l2_weights is not None and config.NN_USE_L2_INIT:
+            l2_mean = np.mean(l2_weights, axis=0)          # (32,)
+            self.W2 = np.tile(l2_mean.reshape(-1,1), (1, config.NN_HIDDEN_2)) * 0.1
+        else:
+            self.W2 = np.random.randn(config.NN_HIDDEN_1, config.NN_HIDDEN_2) * 0.1
+        self.b2 = np.zeros(config.NN_HIDDEN_2)
+
+        # ---- Glowa Q ----
+        self.W_q = np.random.randn(config.NN_HIDDEN_2, n_actions) * 0.1
+        self.b_q = np.zeros(n_actions)
+
+        # ---- Glowa A (opcjonalna) ----
+        if config.NN_USE_A_INIT and a_weights is not None:
+            self.W_a = np.random.randn(config.NN_HIDDEN_2, n_actions) * 0.1
+            self.b_a = np.zeros(n_actions)
+        else:
+            self.W_a = np.random.randn(config.NN_HIDDEN_2, n_actions) * 0.1 if config.NN_USE_A_INIT else None
+            self.b_a = np.zeros(n_actions) if config.NN_USE_A_INIT else None
+
+        # ---- Glowa gate (opcjonalna, diagnostyczna) ----
+        if config.NN_USE_GATE_INIT and gate_weights is not None:
+            self.W_gate = gate_weights.T  # (16,2)
+            self.b_gate = np.zeros(2)
+        else:
+            self.W_gate = np.random.randn(config.NN_HIDDEN_2, 2) * 0.1
+            self.b_gate = np.zeros(2)
+
+        # ---- Glowa modelu swiata ----
+        self.W_wm1 = np.random.randn(24, 16) * 0.1
+        self.b_wm1 = np.zeros(16)
+        self.W_wm2 = np.random.randn(16, n_features + 1) * 0.1
+        self.b_wm2 = np.zeros(n_features + 1)
+
+        # Cache do backprop
+        self.cache = {}
+
+    def forward_q(self, features):
+        """Oblicza Q i zapisuje posrednie wartosci w cache."""
+        z1 = np.dot(features, self.W1) + self.b1
+        a1 = np.maximum(0, z1)                     # ReLU
+        z2 = np.dot(a1, self.W2) + self.b2
+        a2 = np.maximum(0, z2)
+        q = np.dot(a2, self.W_q) + self.b_q
+
+        self.cache.update({
+            'features': features,
+            'z1': z1, 'a1': a1,
+            'z2': z2, 'a2': a2,
+            'q': q
+        })
+        return q
+
+    def forward_gate(self):
+        """Wykorzystuje a2 z cache do obliczenia wag gate."""
+        if 'a2' not in self.cache:
+             return np.array([0.5, 0.5])
+        a2 = self.cache['a2']
+        gate_logits = np.dot(a2, self.W_gate) + self.b_gate
+        exps = np.exp(gate_logits - np.max(gate_logits))
+        gate_weights = exps / np.sum(exps)
+        self.cache['gate_weights'] = gate_weights
+        return gate_weights
+
+    def forward_a(self):
+        """Oblicza wartosci A (avoidance) – jesli glowa istnieje."""
+        if self.W_a is None or 'a2' not in self.cache:
+            return np.zeros(self.n_actions)
+        a2 = self.cache['a2']
+        a_out = np.dot(a2, self.W_a) + self.b_a
+        self.cache['a_out'] = a_out
+        return a_out
+
+    def forward_world(self, action):
+        """Przewiduje nastepny stan i nagrode na podstawie a2 i akcji."""
+        if 'a2' not in self.cache:
+             return np.zeros(self.n_features), 0.0
+
+        a2 = self.cache['a2']
+        action_onehot = np.zeros(self.n_actions)
+        action_onehot[action] = 1.0
+        x = np.concatenate([a2, action_onehot])          # (24,)
+
+        z_wm1 = np.dot(x, self.W_wm1) + self.b_wm1
+        a_wm1 = np.maximum(0, z_wm1)                     # ReLU
+        out = np.dot(a_wm1, self.W_wm2) + self.b_wm2
+
+        next_features_pred = out[:-1]
+        reward_pred = out[-1]
+
+        self.cache.update({
+            'x_wm': x,
+            'z_wm1': z_wm1,
+            'a_wm1': a_wm1,
+            'out_wm': out
+        })
+        return next_features_pred, reward_pred
+
+    def backward_q(self, target_q):
+        """Aktualizacja wag dla Q i warstw wspolnych."""
+        if 'features' not in self.cache: return
+
+        f = self.cache['features']
+        a2 = self.cache['a2']; z2 = self.cache['z2']
+        a1 = self.cache['a1']; z1 = self.cache['z1']
+        q = self.cache['q']
+
+        d_q = q - target_q                                   # (8,)
+
+        d_W_q = np.outer(a2, d_q)                            # (16,8)
+        d_b_q = d_q
+
+        d_a2 = np.dot(d_q, self.W_q.T)                       # (16,)
+        d_z2 = d_a2 * (z2 > 0)                               # ReLU grad
+        d_W2 = np.outer(a1, d_z2)                            # (32,16)
+        d_b2 = d_z2
+
+        d_a1 = np.dot(d_z2, self.W2.T)                       # (32,)
+        d_z1 = d_a1 * (z1 > 0)
+        d_W1 = np.outer(f, d_z1)                             # (82,32)
+        d_b1 = d_z1
+
+        self.W_q -= self.lr * d_W_q
+        self.b_q -= self.lr * d_b_q
+        self.W2  -= self.lr * d_W2
+        self.b2  -= self.lr * d_b2
+        self.W1  -= self.lr * d_W1
+        self.b1  -= self.lr * d_b1
+
+        for w in (self.W1, self.W2, self.W_q):
+            np.clip(w, -self.clip, self.clip, out=w)
+
+    def backward_world(self, target_next_features, target_reward):
+        """Aktualizacja wag modelu swiata (nie rusza warstw wspolnych)."""
+        if 'out_wm' not in self.cache: return
+
+        x = self.cache['x_wm']
+        z_wm1 = self.cache['z_wm1']
+        a_wm1 = self.cache['a_wm1']
+        out = self.cache['out_wm']
+
+        target = np.concatenate([target_next_features, [target_reward]])
+        d_out = out - target                                  # (83,)
+
+        d_W_wm2 = np.outer(a_wm1, d_out)                     # (16,83)
+        d_b_wm2 = d_out
+
+        d_a_wm1 = np.dot(d_out, self.W_wm2.T)                # (16,)
+        d_z_wm1 = d_a_wm1 * (z_wm1 > 0)
+        d_W_wm1 = np.outer(x, d_z_wm1)                       # (24,16)
+        d_b_wm1 = d_z_wm1
+
+        self.W_wm2 -= self.lr * d_W_wm2
+        self.b_wm2 -= self.lr * d_b_wm2
+        self.W_wm1 -= self.lr * d_W_wm1
+        self.b_wm1 -= self.lr * d_b_wm1
+
+        np.clip(self.W_wm1, -self.clip, self.clip, out=self.W_wm1)
+        np.clip(self.W_wm2, -self.clip, self.clip, out=self.W_wm2)
+
+    def generate_counterfactual(self, features, action_taken, actual_reward):
+        """Zwraca (akcja, wartosc, nastepny stan) dla lepszej kontrfaktyki lub None."""
+        self.forward_q(features)        # zeby miec a2 w cache
+
+        best_action = None
+        best_value = -np.inf
+        best_next = None
+
+        # Save original state needed for world model
+        if 'a2' in self.cache:
+            original_a2 = self.cache['a2'].copy()
+        else:
+            return None, None, None
+
+        for a in range(self.n_actions):
+            if a == action_taken:
+                continue
+            next_feat, pred_reward = self.forward_world(a)
+
+            q_next = self.forward_q(next_feat)          # (8,)
+            max_q_next = np.max(q_next)
+            cf_value = pred_reward + self.gamma * max_q_next
+
+            if cf_value > best_value:
+                best_value = cf_value
+                best_action = a
+                best_next = next_feat
+
+            # Restore a2 for next iteration of world model prediction
+            self.cache['a2'] = original_a2
+
+        if best_value > actual_reward + self.config.COUNTERFACTUAL_THRESHOLD:
+            return best_action, best_value, best_next
+        return None, None, None
+
+
+class NeuralHybridBrain:
     def __init__(self, config: SwarmConfig, feature_extractor: FeatureExtractor):
         self.config = config
         self.feature_extractor = feature_extractor
@@ -1245,79 +1482,39 @@ class HybridBrain:
         dummy = self.feature_extractor.extract(
             np.zeros(16), 3.0, 3.0, 0.0, 0.0, 0.0, 0.0, 0, 3.0, None, 0.0, 0.0
         )
-        self.n_features = len(dummy)
+        self.n_features = len(dummy) # Powinno byc 82
 
-        self.q_approx = DualLinearApproximator(
-            n_features=self.n_features,
-            n_actions=self.n_actions,
-            learning_rate=config.LEARNING_RATE,
-            avoidance_penalty=config.AVOIDANCE_PENALTY,   # nowy parametr
-            weight_clip=10.0
+        # Zaladuj wagi z pliku (jesli istnieja)
+        self.nn = NeuralBrainWithImagination(
+            config, self.n_features, self.n_actions,
+            l1_weights=None, l2_weights=None, a_weights=None, gate_weights=None
         )
 
-        # L2 – warstwa skrystalizowana
-        self.l2_features = config.L2_FEATURES
-        self.l2_min_samples = config.L2_MIN_SAMPLES
-        self.l2_learning_rate = config.L2_LEARNING_RATE
-        self.l2_update_freq = config.L2_UPDATE_FREQ
-
-        self.importance_analyzer = FeatureImportanceAnalyzer(
-            n_features=self.n_features,
-            l2_features=self.l2_features
-        )
-        self.l2_approx = None  # powstanie po krystalizacji
-        self.l2_feature_indices = None
-        self.l2_samples_collected = 0
-
-        # Bramka
-        self.gate_features = config.GATE_FEATURES
-        self.gate_learning_rate = config.GATE_LEARNING_RATE
-        self.gate_update_freq = config.GATE_UPDATE_FREQ
-        self.gate_train_start = config.GATE_TRAIN_START
-        self.gate = None
-        self.gate_feature_indices = None
-        self.gate_steps = 0
-
-        # Jesli GATE_FEATURES < n_features, wybieramy najwazniejsze cechy
-        # (na start, pozniej uzyjemy l2_feature_indices)
-        if self.gate_features < self.n_features:
-             self.gate_feature_indices = np.arange(self.gate_features)
-        else:
-             self.gate_feature_indices = np.arange(self.n_features)
-             self.gate_features = self.n_features
-
-        self.gate = GateApproximator(
-            n_features=self.gate_features,
-            learning_rate=self.gate_learning_rate,
-            temperature=config.GATE_SOFTMAX_TEMP
-        )
-
-        # Model Swiata
-        self.world_model_features = config.WORLD_MODEL_FEATURES
-        self.world_model_hidden = config.WORLD_MODEL_HIDDEN
-        self.world_model_lr = config.WORLD_MODEL_LEARNING_RATE
-        self.world_model_update_freq = config.WORLD_MODEL_UPDATE_FREQ
-        self.world_model_batch_size = config.WORLD_MODEL_BATCH_SIZE
-        self.counterfactual_threshold = config.COUNTERFACTUAL_THRESHOLD
-        self.counterfactual_lr = config.COUNTERFACTUAL_LR
-
-        self.world_model = None
-        self.world_model_buffer = WorldModelBuffer(capacity=config.WORLD_MODEL_BUFFER_SIZE)
-        self.world_feature_indices = None
+        # Metadata
+        self.top32_indices = None
+        self.step_counter = 0
         self.counterfactual_count = 0
+        self.lr = config.NN_LEARNING_RATE
 
-        self.last_l2_update = 0
-        self.steps_since_train = 0
-        self.total_steps = 0 # Track total steps for gate training start
+        self.load_or_create()   # patrz sekcja 5
 
+        # Standardowe komponenty
         self.normalizer = RunningNormalizer(self.n_features)
         self.replay_buffer = ReplayBuffer(capacity=config.REPLAY_BUFFER_CAPACITY)
+        self.batch_size = config.REPLAY_BATCH_SIZE
+        self.train_freq = config.REPLAY_TRAIN_FREQ
+        self.steps_since_train = 0
         self.epsilon = config.EPSILON
-        self.lr = config.LEARNING_RATE
+
         self.last_features = None
         self.last_action = None
 
-        logger.info(f"HybridBrain: {self.n_features} features, DualLinear + L2 + Gate + WorldModel")
+        # Rejestracja auto-zapisu
+        import atexit
+        atexit.register(self.save)
+
+        logger.info(f"NeuralHybridBrain: MLP {self.n_features}->{config.NN_HIDDEN_1}->{config.NN_HIDDEN_2}->Output initialized")
+
     def get_features(self, lidar_16, us_left, us_right, encoder_l, encoder_r,
                      lorenz_x, lorenz_z, rear_bumper, min_dist, last_action=None,
                      free_angle=0.0, free_mag=0.0) -> np.ndarray:
@@ -1325,216 +1522,35 @@ class HybridBrain:
             lidar_16, us_left, us_right, encoder_l, encoder_r,
             lorenz_x, lorenz_z, rear_bumper, min_dist, last_action, free_angle, free_mag
         )
-        if raw.shape[0] != self.n_features:
-            self.replay_buffer.buffer.clear()
-            self.n_features = raw.shape[0]
-            # Reinit approximator if features change size
-            self.q_approx = DualLinearApproximator(
-                n_features=self.n_features,
-                n_actions=self.n_actions,
-                learning_rate=self.config.LEARNING_RATE,
-                avoidance_penalty=self.config.AVOIDANCE_PENALTY,
-                weight_clip=10.0
-            )
-
         self.normalizer.update(raw)
         return self.normalizer.normalize(raw)
 
-    def is_bad_state(self, reward: float, source: str, action: Action,
-                     lidar_min: float, stagnant: bool, oscillated: bool) -> Tuple[bool, float]:
-        """
-        Zwraca (czy złe, target_dla_unikania)
-        target może być różny w zależności od wagi zdarzenia.
-        """
-        # Kolizja / twardy odruch (ale nie gdy sam REVERSE)
-        if source in ("LIDAR_HARD_SAFETY", "HARD_REFLEX") and action != Action.REVERSE:
-            return True, 2.0   # bardzo źle
-
-        # Stagnacja – utknięcie (ale nie podczas celowego skrętu)
-        if stagnant and action in (Action.FORWARD, Action.REVERSE):
-            return True, 1.5
-
-        # Oscylacja – wykryta przez anti‑oscillation
-        if oscillated:
-            return True, 1.2
-
-        # Bardzo niska nagroda (np. -2.0 z VirtualDamper)
-        if reward < -1.5:
-            return True, 1.0
-
-        # Jazda do przodu zbyt blisko ściany (ale jeszcze nie kolizja)
-        if action == Action.FORWARD and lidar_min < 0.2:
-            return True, 0.8
-
-        return False, 0.0
-
-    def get_gate_features(self, full_features: np.ndarray) -> np.ndarray:
-        """Wyciaga podzbior cech dla bramki."""
-        if self.gate_feature_indices is None:
-            return full_features
-        return full_features[self.gate_feature_indices]
-
-    def get_gate_target(self, features: np.ndarray, action: Action, reward: float) -> np.ndarray:
-        """
-        Zwraca pozadane wagi bramki dla ostatniego kroku.
-        Jesli reward > 0: preferuj warstwe z wyzszym Q dla wykonanej akcji.
-        Jesli reward <= 0: preferuj druga warstwe (bo ta sie pomylila).
-        """
-        if self.l2_approx is None:
-            return np.array([1.0, 0.0])  # tylko L1
-
-        action_idx = self.actions_list.index(action)
-
-        # Q z L1 i L2 dla wykonanej akcji
-        q1_val = self.q_approx.predict_q(features)[action_idx]
-        l2_features = features[self.l2_feature_indices]
-        q2_val = self.l2_approx.predict_q(l2_features)[action_idx]
-
-        if reward > 0:
-            # Sukces – wzmocnij lepsza warstwe
-            if q1_val > q2_val:
-                return np.array([1.0, 0.0])
-            else:
-                return np.array([0.0, 1.0])
-        else:
-            # Porazka – oslabij warstwe, ktora miala wyzsze Q
-            if q1_val > q2_val:
-                return np.array([0.0, 1.0])  # L1 sie pomylila, ufaj L2
-            else:
-                return np.array([1.0, 0.0])  # L2 sie pomylila, ufaj L1
-
-    def generate_counterfactual(self, state_features: np.ndarray, action_taken: int,
-                                actual_reward: float, actual_next_state: np.ndarray):
-        """
-        Generuje kontrfaktyczne doswiadczenie:
-        - sprawdza wszystkie inne akcje
-        - jesli model swiata przewiduje wyzsza nagrode niz rzeczywista + prog,
-          zwraca (akcja, przewidywana_nagroda, przewidywany_nastepny_stan)
-        """
-        if self.world_model is None:
-            return None, None, None
-
-        state_wm = state_features[self.world_feature_indices]
-        best_pred_reward = -np.inf
-        best_action = None
-        best_next_state = None
-
-        for a in range(self.n_actions):
-            if a == action_taken:
-                continue
-            pred_next, pred_reward = self.world_model.predict(state_wm, a)
-            if pred_reward > best_pred_reward:
-                best_pred_reward = pred_reward
-                best_action = a
-                best_next_state = pred_next
-
-        # Prog: przewidywana nagroda > rzeczywista + threshold
-        if best_pred_reward > actual_reward + self.counterfactual_threshold:
-            # Odtworz pelny nastepny stan (reszta cech bez zmian)
-            full_next = actual_next_state.copy()
-            # Musimy uwazac na wymiary przy przypisaniu
-            # full_next jest (82,), world_feature_indices moze byc np (32,)
-            # best_next_state jest (32,)
-            for i, idx in enumerate(self.world_feature_indices):
-                 full_next[idx] = best_next_state[i]
-
-            return best_action, best_pred_reward, full_next
-
-        return None, None, None
-
-    def crystallize_l2(self, force: bool = False):
-        """
-        Tworzy aproksymator L2 na podstawie najwazniejszych cech.
-        """
-        if self.l2_approx is not None and not force:
-            return  # juz skrystalizowane
-
-        indices = self.importance_analyzer.get_top_features(force=force)
-        if indices is None:
-            logger.info("L2: za malo danych do krystalizacji")
-            return
-
-        self.l2_feature_indices = indices
-        n_l2 = len(indices)
-
-        # Inicjalizacja nowego aproksymatora L2
-        self.l2_approx = DualLinearApproximator(
-            n_features=n_l2,
-            n_actions=self.n_actions,
-            learning_rate=self.l2_learning_rate,
-            avoidance_penalty=self.config.AVOIDANCE_PENALTY,
-            weight_clip=10.0
-        )
-
-        # Transfer wiedzy z L1 do L2 (dla wybranych cech)
-        for a in range(self.n_actions):
-            self.l2_approx.q_weights[a] = self.q_approx.q_weights[a][indices]
-            self.l2_approx.a_weights[a] = self.q_approx.a_weights[a][indices]
-
-        logger.info(f"L2 skrystalizowana: {n_l2} cech, transfer wiedzy zakonczony")
-        self.importance_analyzer.freeze()
-
-        # Aktualizacja indeksow dla bramki (teraz uzywamy tych samych co L2)
-        if self.gate_features <= n_l2:
-             self.gate_feature_indices = indices[:self.gate_features]
-        else:
-             # Fallback
-             self.gate_feature_indices = indices
-
-        # Po utworzeniu L2, zainicjalizuj model swiata (jesli nie istnieje)
-        if self.world_model is None and self.l2_feature_indices is not None:
-            # Zaktualizuj indeksy cech (mogly sie zmienic)
-            n_wm = min(self.world_model_features, len(self.l2_feature_indices))
-            self.world_feature_indices = self.l2_feature_indices[:n_wm]
-
-            self.world_model = WorldModel(
-                state_dim=len(self.world_feature_indices),
-                action_dim=self.n_actions,
-                hidden_dim=self.world_model_hidden,
-                learning_rate=self.world_model_lr
-            )
-            logger.info(f"Model swiata zainicjalizowany: {len(self.world_feature_indices)} cech")
-
-    def predict_l2(self, full_features):
-        if self.l2_approx is None or self.l2_feature_indices is None:
-            return None
-        l2_features = full_features[self.l2_feature_indices]
-        return self.l2_approx.predict(l2_features)
-
     def decide(self, features: np.ndarray, instinct_bias: Dict[Action, float],
                concept_suggestion: Optional[Action]) -> Tuple[Action, str, np.ndarray]:
-        """
-        Zwraca (akcja, zrodlo, wagi_bramki)
-        """
+
         if random.random() < self.epsilon:
-            return random.choice(self.actions_list), "EXPLORE", np.array([0.5, 0.5])
+            return random.choice(self.actions_list), "EXPLORE", np.zeros(2)
 
-        # Q z L1 (z uwzglednieniem unikania)
-        q1 = self.q_approx.predict(features)
+        q = self.nn.forward_q(features)
+        # opcjonalnie: odejmij kare avoidance
+        if self.nn.W_a is not None:
+            a_out = self.nn.forward_a()
+            q = q - self.config.AVOIDANCE_PENALTY * a_out
 
-        # Q z L2 (jesli istnieje)
-        if self.l2_approx is not None:
-            l2_features = features[self.l2_feature_indices]
-            q2 = self.l2_approx.predict(l2_features)
-        else:
-            q2 = q1  # fallback
-
-        # Wagi bramki
-        gate_features = self.get_gate_features(features)
-        gate_weights = self.gate.predict_weights(gate_features)
-
-        # Polaczone Q
-        combined_q = gate_weights[0] * q1 + gate_weights[1] * q2
-
-        # Dodaj instynkt i koncept
-        scores = combined_q.copy()
+        scores = q.copy()
         for i, action in enumerate(self.actions_list):
             scores[i] += instinct_bias.get(action, 0.0) * 4.0
             if action == concept_suggestion:
                 scores[i] += 1.5
 
         best_idx = int(np.argmax(scores))
-        return self.actions_list[best_idx], "GATED", gate_weights
+
+        # Gate weights for diagnostics (if gate exists)
+        gate_weights = np.zeros(2)
+        if hasattr(self.nn, 'W_gate'):
+             gate_weights = self.nn.forward_gate()
+
+        return self.actions_list[best_idx], "NEURAL", gate_weights
 
     def update_q(self, old_features: np.ndarray, action: Action,
                  reward: float, new_features: np.ndarray,
@@ -1544,98 +1560,146 @@ class HybridBrain:
 
         action_idx = self.actions_list.index(action)
 
-        # Czy to zle doswiadczenie?
-        is_bad, bad_target = self.is_bad_state(reward, source, action,
-                                                lidar_min, stagnant, oscillated)
+        # Dodaj do replay buffera
+        self.replay_buffer.push(old_features, action_idx, reward, new_features, done)
 
-        if is_bad:
-            # Aktualizuj macierz unikania
-            self.q_approx.update_a(old_features, action_idx, bad_target)
-        else:
-            # Normalna aktualizacja Q (TD)
+        # Uczenie modelu swiata na biezacym doswiadczeniu
+        self.nn.forward_q(old_features)          # wypelnia cache
+        self.nn.forward_world(action_idx)        # forward swiata
+        self.nn.backward_world(new_features, reward)
+
+        # Generuj kontrfaktyke
+        cf = self.nn.generate_counterfactual(old_features, action_idx, reward)
+        if cf[0] is not None:
+            cf_action, cf_val, cf_next = cf
+            self.replay_buffer.push(old_features, cf_action, cf_val, cf_next, done)
+            self.counterfactual_count += 1
+
+        # Decay epsilon i LR
+        self.epsilon = max(self.config.EPSILON_MIN,
+                           self.epsilon * self.config.EPSILON_DECAY)
+        self.lr = max(self.config.LR_MIN,
+                      self.lr * self.config.LR_DECAY)
+        self.nn.lr = self.lr
+
+        self.steps_since_train += 1
+        if self.steps_since_train >= self.train_freq and len(self.replay_buffer) >= self.batch_size:
+            self._train_on_batch()
+            self.steps_since_train = 0
+
+        self.step_counter += 1
+        if self.step_counter % 400 == 0:
+            self.save()
+
+    def _train_on_batch(self):
+        batch = self.replay_buffer.sample(self.batch_size)
+        for old_feat, act_idx, reward, new_feat, done in batch:
+            self.nn.forward_q(old_feat)
             if done:
                 target_q = reward
             else:
-                next_q = self.q_approx.predict_q(new_features)
-                max_next_q = float(np.max(next_q))
+                q_next = self.nn.forward_q(new_feat)
+                max_next_q = np.max(q_next)
                 target_q = reward + self.config.DISCOUNT_FACTOR * max_next_q
-            self.q_approx.update_q(old_features, action_idx, target_q)
 
-        self.epsilon = max(self.config.EPSILON_MIN, self.epsilon * self.config.EPSILON_DECAY)
-        self.lr = max(self.config.LR_MIN, self.lr * self.config.LR_DECAY)
-        self.q_approx.set_learning_rate(self.lr)
+            target_q_vec = self.nn.cache['q'].copy()
+            target_q_vec[act_idx] = target_q
+            self.nn.backward_q(target_q_vec)
 
-        self.steps_since_train += 1
-        self.total_steps += 1
+    WEIGHTS_DIR = "weights/"
+    WEIGHTS_FILE = "hierarchical_swarm_mlp_v6.npz"
+    WEIGHTS_PATH = os.path.join(WEIGHTS_DIR, WEIGHTS_FILE)
 
-        # Aktualizacja analizatora waznosci (co l2_update_freq krokow)
-        if self.steps_since_train % self.l2_update_freq == 0:
-            self.importance_analyzer.update(
-                self.q_approx.q_weights,
-                self.q_approx.a_weights
-            )
-            self.l2_samples_collected += 1
+    def save(self, path=None):
+        if path is None:
+            path = self.WEIGHTS_PATH
+        os.makedirs(self.WEIGHTS_DIR, exist_ok=True)
 
-            if (self.l2_approx is None and
-                self.l2_samples_collected * self.l2_update_freq >= self.l2_min_samples):
-                self.crystallize_l2()
+        # Sprawdz, czy wagi nie zawieraja NaN/Inf
+        for name, arr in [('W1', self.nn.W1), ('b1', self.nn.b1)]:
+            if np.any(np.isnan(arr)) or np.any(np.isinf(arr)):
+                print(f"!!! Wykryto NaN/Inf w {name} – zapis wstrzymany !!!")
+                return
 
-        # Aktualizacja bramki (po zebraniu wystarczajacej liczby krokow)
-        if self.total_steps > self.gate_train_start:
-            gate_features = self.get_gate_features(old_features)
-            target_gate = self.get_gate_target(old_features, action, reward)
-            self.gate.update(gate_features, target_gate)
-            self.gate_steps += 1
+        # Opcjonalny backup
+        import shutil
+        if os.path.exists(path):
+            backup = path + ".backup"
+            shutil.copy(path, backup)
 
-        # Zbieranie danych dla modelu swiata (tylko jesli istnieje)
-        if self.world_model is not None:
-            state_wm = old_features[self.world_feature_indices]
-            next_state_wm = new_features[self.world_feature_indices]
-            self.world_model_buffer.push(state_wm, action_idx, next_state_wm, reward)
-
-        # Trening modelu swiata (co WORLD_MODEL_UPDATE_FREQ krokow)
-        if (self.world_model is not None and
-            self.total_steps % self.world_model_update_freq == 0 and
-            len(self.world_model_buffer) >= self.world_model_batch_size):
-
-            batch = self.world_model_buffer.sample(self.world_model_batch_size)
-            for state_wm, act, next_state_wm, rew in batch:
-                self.world_model.train_step(state_wm, act, next_state_wm, rew)
-
-        # Replay Buffer
-        self.replay_buffer.push(old_features, action_idx, reward, new_features, done)
-
-        # Generuj kontrfaktyke
-        cf_action, cf_reward, cf_next = self.generate_counterfactual(
-            old_features, action_idx, reward, new_features
+        np.savez(
+            path,
+            W1=self.nn.W1, b1=self.nn.b1,
+            W2=self.nn.W2, b2=self.nn.b2,
+            W_gate=self.nn.W_gate, b_gate=self.nn.b_gate,
+            W_q=self.nn.W_q, b_q=self.nn.b_q,
+            W_a=self.nn.W_a if self.nn.W_a is not None else np.array([]),
+            b_a=self.nn.b_a if self.nn.b_a is not None else np.array([]),
+            W_wm1=self.nn.W_wm1, b_wm1=self.nn.b_wm1,
+            W_wm2=self.nn.W_wm2, b_wm2=self.nn.b_wm2,
+            top32_indices=getattr(self, 'top32_indices', np.array([], dtype=np.int32)),
+            step_counter=np.array([self.step_counter], dtype=np.int64),
+            freeze_l1_steps=np.array([self.config.L2_MIN_SAMPLES]),
+            avoidance_penalty=np.array([self.config.AVOIDANCE_PENALTY]),
+            learning_rate=np.array([self.lr]),
+            counterfactual_count=np.array([self.counterfactual_count]),
+            version=np.array(['6.0'], dtype=object),
+            saved_at=np.array([time.strftime("%Y-%m-%d %H:%M:%S")], dtype=object)
         )
+        logger.info(f"Model zapisany do {path}")
 
-        if cf_action is not None:
-            # Dodaj do replay buffera jako osobne doswiadczenie
-            # Uwaga: dla kontrfaktyki uzywamy old_features, ale z inna akcja i przewidywanym skutkiem
-            self.replay_buffer.push(old_features, cf_action, cf_reward, cf_next, done)
-            self.counterfactual_count += 1
+    def load_or_create(self, path=None):
+        if path is None:
+            path = self.WEIGHTS_PATH
 
-            # W tym prostym setupie nie mamy oddzielnego "update from buffer" stepu poza samym push,
-            # ktory jest uzywany przez hipotetyczny mechanizm treningu.
-            # Ale poniewaz uzywamy TD online, powinnismy tez zrobic update wag dla kontrfaktyki!
+        if not os.path.exists(path):
+            print(f"Brak pliku {path} – tworze nowy model.")
+            return False
 
-            # Aktualizacja Q dla kontrfaktyki (z mniejszym LR)
-            # Oblicz target dla CF
-            # TODO: To wymaga logiki Q-update. Mozemy wywolac update_q rekurencyjnie?
-            # Nie, bo to zapetli logike buffera i statystyk.
-            # Zrobmy szybki update Q in-place.
+        try:
+            data = np.load(path, allow_pickle=True)
+            required = ['W1','b1','W2','b2','W_gate','b_gate','W_q','b_q','W_wm1','b_wm1','W_wm2','b_wm2']
+            missing = [k for k in required if k not in data]
+            if missing:
+                # raise ValueError(f"Brakujace klucze: {missing}")
+                logger.warning(f"Brakujace klucze w npz: {missing}. Inicjalizacja czesciowa lub nowa.")
+                # Nie przerywamy, moze to starsza wersja
 
-            cf_next_q = self.q_approx.predict_q(cf_next)
-            cf_max_next = float(np.max(cf_next_q))
-            cf_target = cf_reward + self.config.DISCOUNT_FACTOR * cf_max_next
+            if 'W1' in data: self.nn.W1 = data['W1'].astype(np.float32)
+            if 'b1' in data: self.nn.b1 = data['b1'].astype(np.float32)
+            if 'W2' in data: self.nn.W2 = data['W2'].astype(np.float32)
+            if 'b2' in data: self.nn.b2 = data['b2'].astype(np.float32)
+            if 'W_gate' in data: self.nn.W_gate = data['W_gate'].astype(np.float32)
+            if 'b_gate' in data: self.nn.b_gate = data['b_gate'].astype(np.float32)
+            if 'W_q' in data: self.nn.W_q = data['W_q'].astype(np.float32)
+            if 'b_q' in data: self.nn.b_q = data['b_q'].astype(np.float32)
 
-            # Uzyj metody update_q approximatora
-            # Ale uwaga na LR - chcemy mniejszy wplyw
-            original_lr = self.q_approx.lr
-            self.q_approx.set_learning_rate(self.config.COUNTERFACTUAL_LR * self.lr) # Skalowanie
-            self.q_approx.update_q(old_features, cf_action, cf_target)
-            self.q_approx.set_learning_rate(original_lr)
+            if 'W_a' in data and data['W_a'].size > 0:
+                self.nn.W_a = data['W_a'].astype(np.float32)
+                self.nn.b_a = data['b_a'].astype(np.float32)
+            else:
+                self.nn.W_a = None
+                self.nn.b_a = None
+
+            if 'W_wm1' in data: self.nn.W_wm1 = data['W_wm1'].astype(np.float32)
+            if 'b_wm1' in data: self.nn.b_wm1 = data['b_wm1'].astype(np.float32)
+            if 'W_wm2' in data: self.nn.W_wm2 = data['W_wm2'].astype(np.float32)
+            if 'b_wm2' in data: self.nn.b_wm2 = data['b_wm2'].astype(np.float32)
+
+            self.top32_indices = data.get('top32_indices')
+            self.step_counter = int(data.get('step_counter', 0))
+            self.counterfactual_count = int(data.get('counterfactual_count', 0))
+            self.lr = float(data.get('learning_rate', self.config.LEARNING_RATE))
+
+            version = data.get('version', '?')
+            saved_at = data.get('saved_at', 'nieznana data')
+            print(f"Wczytano model v{version}, krok {self.step_counter}, zapis: {saved_at}")
+            return True
+
+        except Exception as e:
+            print(f"Blad wczytywania {path}: {e}\nTworze nowy model.")
+            return False
+
 
 class DCMotorController:
     def __init__(self, config: SwarmConfig):
@@ -1788,11 +1852,12 @@ class SwarmCoreV55:
         self.feature_extractor = FeatureExtractor(self.config)
 
         # AI Layers
-        self.brain = HybridBrain(self.config, self.feature_extractor)
+        self.brain = NeuralHybridBrain(self.config, self.feature_extractor)
         self.concept_graph = ConceptGraph(self.config)  # ★ WŁAŚCIWY!
 
         # Moduly
         self.lorenz = LorenzAttractor(self.config)
+        self.brain.lorenz = self.lorenz
         self.instinct = FreeSpaceInstinct(self.config)
         self.velocity_mapper = DynamicVelocityMapper(self.config)
         self.stabilizer = ActionStabilizer(self.config)
@@ -1824,79 +1889,23 @@ class SwarmCoreV55:
     def _load_state(self):
         saved = self.state_manager.load()
         if saved:
-            if 'q_weights' in saved and saved['q_weights'] is not None:
-                try:
-                    self.brain.q_approx.q_weights = np.array(saved['q_weights'])
-                    if 'a_weights' in saved and saved['a_weights'] is not None:
-                        self.brain.q_approx.a_weights = np.array(saved['a_weights'])
-                    else:
-                        self.brain.q_approx.a_weights = np.zeros_like(self.brain.q_approx.q_weights)
-                    logger.info("Brain weights loaded (Q+A)")
-                except Exception as e:
-                    logger.error(f"Failed to load brain weights: {e}")
-            elif 'nn_W1' in saved:
-                 logger.warning("Found old Neural Network weights - ignoring/resetting to DualLinear")
+            # Brain weights are now handled by NeuralHybridBrain via .npz file
+            # so we skip loading weights from pickle here to avoid AttributeError.
 
-            # L2 loading
-            if 'l2_q_weights' in saved and saved['l2_q_weights'] is not None:
-                try:
-                    self.brain.l2_feature_indices = np.array(saved['l2_feature_indices'])
-                    self.brain.l2_approx = DualLinearApproximator(
-                        n_features=len(self.brain.l2_feature_indices),
-                        n_actions=self.brain.n_actions,
-                        learning_rate=self.config.L2_LEARNING_RATE,
-                        avoidance_penalty=self.config.AVOIDANCE_PENALTY
-                    )
-                    self.brain.l2_approx.q_weights = np.array(saved['l2_q_weights'])
-                    self.brain.l2_approx.a_weights = np.array(saved['l2_a_weights'])
-                    logger.info(f"L2 zaladowana: {len(self.brain.l2_feature_indices)} cech")
-                except Exception as e:
-                    logger.error(f"Failed to load L2: {e}")
-
-            # Gate loading
-            if 'gate_weights' in saved and saved['gate_weights'] is not None:
-                try:
-                    self.brain.gate_feature_indices = np.array(saved['gate_feature_indices'])
-                    self.brain.gate = GateApproximator(
-                        n_features=len(self.brain.gate_feature_indices),
-                        learning_rate=self.config.GATE_LEARNING_RATE,
-                        temperature=self.config.GATE_SOFTMAX_TEMP
-                    )
-                    self.brain.gate.weights = np.array(saved['gate_weights'])
-                    self.brain.gate.bias = np.array(saved['gate_bias'])
-                    self.brain.gate_steps = saved.get('gate_steps', 0)
-                    logger.info(f"Bramka zaladowana: {len(self.brain.gate_feature_indices)} cech, {self.brain.gate_steps} krokow")
-                except Exception as e:
-                    logger.error(f"Failed to load Gate: {e}")
-
-            # World Model loading
-            if 'wm_state' in saved and saved['wm_state'] is not None:
-                try:
-                    self.brain.world_feature_indices = np.array(saved['wm_feature_indices'])
-                    self.brain.world_model = WorldModel(
-                        state_dim=len(self.brain.world_feature_indices),
-                        action_dim=self.brain.n_actions,
-                        hidden_dim=self.config.WORLD_MODEL_HIDDEN,
-                        learning_rate=self.config.WORLD_MODEL_LEARNING_RATE
-                    )
-                    self.brain.world_model.set_state(saved['wm_state'])
-                    self.brain.counterfactual_count = saved.get('counterfactual_count', 0)
-                    logger.info(f"Model swiata zaladowany: {len(self.brain.world_feature_indices)} cech, CF={self.brain.counterfactual_count}")
-                except Exception as e:
-                    logger.error(f"Failed to load World Model: {e}")
-
+            # Load non-brain components
             norm_state = saved.get('normalizer_state')
-            if norm_state and norm_state.get('n', 0) > 0:
+            if norm_state and norm_state.get('n', 0) > 0 and hasattr(self.brain, 'normalizer'):
                 saved_mean = np.array(norm_state['mean'])
                 if len(saved_mean) == self.brain.n_features:
                     self.brain.normalizer.set_state(norm_state)
                     logger.info(f"Loaded normalizer: n={norm_state['n']} samples")
-                else:
-                    self.brain.normalizer = RunningNormalizer(self.brain.n_features)
 
-            self.brain.epsilon = saved.get('epsilon', self.config.EPSILON)
-            self.brain.lr      = saved.get('lr', self.config.LEARNING_RATE)
-            self.brain.q_approx.set_learning_rate(self.brain.lr)
+            if hasattr(self.brain, 'epsilon'):
+                self.brain.epsilon = saved.get('epsilon', self.config.EPSILON)
+            if hasattr(self.brain, 'lr'):
+                self.brain.lr      = saved.get('lr', self.config.LEARNING_RATE)
+            if hasattr(self.brain, 'nn'):
+                self.brain.nn.lr   = self.brain.lr
 
             saved_concepts = saved.get('concepts', {})
             if saved_concepts:
@@ -1913,44 +1922,11 @@ class SwarmCoreV55:
                 self.lorenz.x, self.lorenz.y, self.lorenz.z = lorenz_state
 
     def save_state(self):
-        concepts_data = {}
-        for name, c in self.concept_graph.concepts.items():
-            concepts_data[name] = {
-                'name': c.name,
-                'sequence': c.sequence,
-                'activation': c.activation,
-                'success_count': c.success_count,
-                'usage_count': c.usage_count,
-                'context': c.context
-            }
-
-        data = {
-            'q_weights': self.brain.q_approx.q_weights.tolist(),
-            'a_weights': self.brain.q_approx.a_weights.tolist(),
-            'normalizer_state': self.brain.normalizer.get_state(),
-            'epsilon':          self.brain.epsilon,
-            'lr':               self.brain.lr,
-            'concepts':         concepts_data,
-            'lorenz_state':     self.lorenz.get_state(),
-        }
-
-        if self.brain.l2_approx is not None:
-            data['l2_q_weights'] = self.brain.l2_approx.q_weights.tolist()
-            data['l2_a_weights'] = self.brain.l2_approx.a_weights.tolist()
-            data['l2_feature_indices'] = self.brain.l2_feature_indices.tolist()
-
-        if self.brain.gate is not None:
-            data['gate_weights'] = self.brain.gate.weights.tolist()
-            data['gate_bias'] = self.brain.gate.bias.tolist()
-            data['gate_feature_indices'] = self.brain.gate_feature_indices.tolist()
-            data['gate_steps'] = self.brain.gate_steps
-
-        if self.brain.world_model is not None:
-            data['wm_state'] = self.brain.world_model.get_state()
-            data['wm_feature_indices'] = self.brain.world_feature_indices.tolist()
-            data['counterfactual_count'] = self.brain.counterfactual_count
-
-        self.state_manager.save(data)
+        # Delegate saving to the brain component which handles the new NPZ format
+        if hasattr(self.brain, 'save'):
+            self.brain.save()
+        else:
+            logger.warning("Brain does not have save method")
 
     def _compute_dynamic_safety(self, avg_speed: float) -> Tuple[float, float]:
         scale = self.config.SAFETY_DIST_SPEED_SCALE
@@ -2093,7 +2069,7 @@ class SwarmCoreV55:
              us_left_dist: float = 3.0, us_right_dist: float = 3.0,
              rear_bumper: int = 0,
              dt: float = 0.033) -> Tuple[float, float]:
-        """Główna pętla decyzyjna (v5.5 - dual US + rear bumper)"""
+        """Glowna petla decyzyjna (v5.5 - dual US + rear bumper)"""
 
         self.cycle_count += 1
         us_front_min = min(us_left_dist, us_right_dist)
@@ -2115,12 +2091,12 @@ class SwarmCoreV55:
         # 4. Free space instinct (WZMOCNIONY z USL/USR + front sektory)
         free_angle, free_mag = self.instinct.compute_free_space_vector(lidar_16)
 
-        # ★ front_clearance: średnia wolności przednich sektorów (14,15,0,1 = ±45° od 0°)
+        # ★ front_clearance: srednia wolnosci przednich sektorow (14,15,0,1 = ±45° od 0°)
         #   lidar_16[i] = 1-dist/max → HIGH=przeszkoda, LOW=wolno
-        #   front_clearance 1.0 = czysto z przodu, 0.0 = ściana wprost
+        #   front_clearance 1.0 = czysto z przodu, 0.0 = sciana wprost
         front_occ     = float(np.mean([lidar_16[14], lidar_16[15],
                                        lidar_16[0],  lidar_16[1]]))
-        front_clearance = 1.0 - front_occ   # odwróć: 1=wolno, 0=ściana
+        front_clearance = 1.0 - front_occ   # odwroc: 1=wolno, 0=sciana
 
         instinct_bias = self.instinct.get_bias_for_action(
             free_angle,
@@ -2148,7 +2124,7 @@ class SwarmCoreV55:
             concept_suggestion = self.concept_graph.get_next_action_from_concept(best_concept)
             if self.cycle_count % 50 == 0:
                 logger.info(
-                    f"[CONCEPT] Użyto konceptu '{best_concept.name}' "
+                    f"[CONCEPT] Uzyto konceptu '{best_concept.name}' "
                     f"(aktywacja={best_concept.activation:.2f}) "
                     f"→ sugestia: {concept_suggestion.name if concept_suggestion else 'None'}"
                 )
@@ -2156,12 +2132,12 @@ class SwarmCoreV55:
         # 7. Decision (Q + Instinct + Concept!)
         collision = (us_front_min < dyn_us) or (self.lidar.min_dist < dyn_lidar)
 
-        gate_weights = np.array([0.5, 0.5], dtype=np.float32)
+        gate_weights = np.zeros(2)
 
         if safety_override:
             final_action, source = safety_override
         else:
-            # ★ NOWE: Anti-stagnation może wymusić skręt
+            # ★ NOWE: Anti-stagnation moze wymusic skret
             forced_turn = self.anti_stagnation.should_force_turn()
             if forced_turn is not None:
                 final_action = forced_turn
@@ -2171,7 +2147,7 @@ class SwarmCoreV55:
                 action_candidate, source, gate_weights = self.brain.decide(features, instinct_bias, concept_suggestion)
                 final_action = self.stabilizer.update(action_candidate)
 
-        # ★ NOWE: Anti-oscillation — wykryj pętlę REVERSE↔FORWARD
+        # ★ NOWE: Anti-oscillation — wykryj petle REVERSE↔FORWARD
         if final_action == self._last_action_type:
             self._action_repeat_count += 1
         else:
@@ -2205,18 +2181,16 @@ class SwarmCoreV55:
             source = "FRONT_BLOCKED_TURN"
             self.stabilizer.force_unlock()
 
-        # 8. Reward (★ z karą za bliskość ściany przy FORWARD)
+        # 8. Reward (★ z kara za bliskosc sciany przy FORWARD)
         reward = self.damper.compute_reward(encoder_l, encoder_r, motor_current, final_action)
 
-        # ★ NOWE: Kara za FORWARD blisko ściany — uczy Q-table żeby nie jechać w ścianę
+        # ★ NOWE: Kara za FORWARD blisko sciany — uczy Q-table zeby nie jechac w sciane
         if final_action == Action.FORWARD and self.lidar.min_dist < 0.35:
             proximity_penalty = -2.0 * (1.0 - self.lidar.min_dist / 0.35)
             reward += proximity_penalty
 
-        # 9. Q-Update v5.10 — Avoidance Layer
+        # 9. Q-Update
         #    Uczenie ZAWSZE (nawet na wymuszonych akcjach):
-        #    - zle doswiadczenia  -> macierz A (unikanie)
-        #    - dobre/neutralne   -> macierz Q (TD learning)
         if self.brain.last_features is not None and self.brain.last_action is not None:
             oscillated = (
                 source == "ANTI_OSCILLATION"
@@ -2298,7 +2272,7 @@ class SwarmCoreV55:
 
         # 19. Anti-stagnation — chaos TYLKO dla TURN/SPIN
         avg_pwm = (abs(pwm_l) + abs(pwm_r)) / 2.0
-        # Przekaż aktualną akcję — spin/turn NIE jest stagnacją!
+        # Przekaz aktualna akcje — spin/turn NIE jest stagnacja!
         self.anti_stagnation.update(self.motors.x, self.motors.y, avg_pwm,
                                     current_action=final_action)
         if final_action in (Action.TURN_LEFT, Action.TURN_RIGHT,
@@ -2313,7 +2287,7 @@ class SwarmCoreV55:
 
         # 19b. ★ FORWARD: symetria + mikro-szum Lorenz (±1-3 PWM)
         if final_action == Action.FORWARD:
-            # Krok 1: Wymuszaj symetrię bazową
+            # Krok 1: Wymuszaj symetrie bazowa
             avg_pwm_fwd = (pwm_l + pwm_r) / 2.0
 
             # Krok 2: Mikro-szum Lorenz (±1-3 PWM — naturalny dryf)
@@ -2328,15 +2302,15 @@ class SwarmCoreV55:
             pwm_l = avg_pwm_fwd + micro_noise - encoder_corr
             pwm_r = avg_pwm_fwd - micro_noise + encoder_corr
 
-            # ★ KRYTYCZNE: Zsynchronizuj pamięć PID!
+            # ★ KRYTYCZNE: Zsynchronizuj pamiec PID!
             self.motors.sync_memory(pwm_l, pwm_r)
 
         # 20. Odometry
         self.motors.update_odometry(encoder_l, encoder_r, dt)
 
         # 21. ★ Auto-save (wbudowane!)
-        if self.state_manager.should_auto_save():
-            self.save_state()
+        # if self.state_manager.should_auto_save():
+        #     self.save_state()
 
         # 22. Pelna diagnostyka co 50 cykli
         if self.cycle_count % 50 == 0:
@@ -2344,21 +2318,15 @@ class SwarmCoreV55:
             free_info   = (f"front_clr={front_clearance:.2f} "
                            f"free_ang={math.degrees(free_angle):+.0f}deg mag={free_mag:.2f}")
             stag_info   = "STAGNANT!" if self.anti_stagnation.is_stagnant else "ok"
-            q_vals      = self.brain.q_approx.predict_q(features)
-            l2_info = f"L2={self.brain.l2_approx is not None}"
-            if self.brain.l2_feature_indices is not None:
-                l2_info += f"({len(self.brain.l2_feature_indices)})"
-            gate_info = f"Gate=[{gate_weights[0]:.2f},{gate_weights[1]:.2f}]" if source == "GATED" else "Gate=off"
-            wm_info = ""
-            if self.brain.world_model is not None:
-                wm_info = f"WMbuf={len(self.brain.world_model_buffer)} CF={self.brain.counterfactual_count}"
-            else:
-                wm_info = "WM=None"
+            q_vals      = self.brain.nn.cache.get('q', np.zeros(8))
             q_info      = (f"Q=[{np.min(q_vals):+.2f},{np.max(q_vals):+.2f}] "
                            f"Qnrm={np.linalg.norm(q_vals):.1f} "
                            f"eps={self.brain.epsilon:.3f} lr={self.brain.lr:.5f} "
                            f"buf={len(self.brain.replay_buffer)}")
-            wm_info = "CF=N/A"
+
+            gate_info = f"Gate=[{gate_weights[0]:.2f},{gate_weights[1]:.2f}]" if source == "NEURAL" else "Gate=off"
+
+            wm_info = f"CF={self.brain.counterfactual_count}"
 
             logger.info(
                 f"[DIAG] c={self.cycle_count} "
@@ -2367,11 +2335,11 @@ class SwarmCoreV55:
                 f"Lmin={self.lidar.min_dist:.2f} "
                 f"act={final_action.name} src={source} "
                 f"{lorenz_info} {free_info} stag={stag_info} "
-                f"{q_info} {l2_info} {gate_info} {wm_info}"
+                f"{q_info} {gate_info} {wm_info}"
             )
 
 
-        # ★★★ FINAL SAFETY CLAMP — zawsze na końcu, bez wyjątków!
+        # ★★★ FINAL SAFETY CLAMP — zawsze na koncu, bez wyjatkow!
         pwm_l = np.clip(pwm_l, -self.config.PWM_MAX, self.config.PWM_MAX)
         pwm_r = np.clip(pwm_r, -self.config.PWM_MAX, self.config.PWM_MAX)
 
@@ -2380,17 +2348,9 @@ class SwarmCoreV55:
     def get_stats(self) -> Dict:
         return {
             'cycle_count':       self.cycle_count,
-            'q_weights_norm':    float(np.linalg.norm(self.brain.q_approx.q_weights)),
-            'a_weights_norm':    float(np.linalg.norm(self.brain.q_approx.a_weights)),
-            'l2_exists':         self.brain.l2_approx is not None,
-            'l2_features':       len(self.brain.l2_feature_indices) if self.brain.l2_feature_indices is not None else 0,
-            'l2_samples':        self.brain.l2_samples_collected * self.brain.l2_update_freq,
-            'gate_exists':       self.brain.gate is not None,
-            'gate_steps':        self.brain.gate_steps if hasattr(self.brain, 'gate_steps') else 0,
-            'gate_weights_mean': float(np.mean(self.brain.gate.weights)) if self.brain.gate is not None else 0.0,
-            'world_model_exists': self.brain.world_model is not None,
-            'world_model_buffer': len(self.brain.world_model_buffer),
-            'counterfactual_count': self.brain.counterfactual_count,
+            'q_weights_norm':    float(np.linalg.norm(self.brain.nn.W_q)),
+            'gate_weights_norm': float(np.linalg.norm(self.brain.nn.W_gate)),
+            'cf_count':          self.brain.counterfactual_count,
             'epsilon':           self.brain.epsilon,
             'lr':                self.brain.lr,
             'replay_size':       len(self.brain.replay_buffer),
@@ -2436,22 +2396,6 @@ if __name__ == "__main__":
     gate.update(feat, np.array([1.0, 0.0]))
     print("✓ GateApproximator OK")
 
-    print("\n=== UNIT 5: get_gate_target ===")
-    cfg = SwarmConfig()
-    fe = FeatureExtractor(cfg)
-    brain = HybridBrain(cfg, fe)
-    # Symulacja L1 i L2
-    brain.l2_feature_indices = np.arange(32)
-    # brain.l2_approx = brain.q_approx # Nie dziala bo wymiary inne (32 vs 82)
-    # Musimy stworzyc dummy L2
-    brain.l2_approx = DualLinearApproximator(32, 8)
-
-    feat = np.random.randn(82).astype(np.float32)
-    target = brain.get_gate_target(feat, Action.FORWARD, 1.0)
-    assert target.shape == (2,)
-    print("✓ get_gate_target OK")
-
-    print("\n=== UNIT 6: WorldModel ===")
     wm = WorldModel(state_dim=32, action_dim=8)
     state = np.random.randn(32).astype(np.float32)
     next_state, reward = wm.predict(state, 3)
@@ -2463,26 +2407,36 @@ if __name__ == "__main__":
     wm.train_step(state, 3, target_next, 1.0)
     print("✓ WorldModel.train_step OK")
 
-    print("\n=== UNIT 7: Counterfactual generation ===")
-    # Potrzebujemy HybridBrain z zainicjalizowanym L2 i modelem swiata
-    # brain juz mamy z UNIT 5
-    brain.world_feature_indices = np.arange(16)
-    brain.world_model = WorldModel(state_dim=16, action_dim=8)
+    print("\n=== UNIT 8: NeuralBrainWithImagination ===")
+    nn = NeuralBrainWithImagination(cfg)
+    feat = np.random.randn(82).astype(np.float32)
+    q = nn.forward_q(feat)
+    assert q.shape == (8,)
+    print("✓ forward_q OK")
 
-    # Przygotuj dane
-    full_state = np.random.randn(82).astype(np.float32)
-    full_next = np.random.randn(82).astype(np.float32)
+    gate = nn.forward_gate()
+    assert gate.shape == (2,) and np.isclose(np.sum(gate), 1.0)
+    print("✓ forward_gate OK")
 
-    cf_action, cf_reward, cf_next = brain.generate_counterfactual(
-        full_state, 2, 0.5, full_next
-    )
+    next_feat, pred_reward = nn.forward_world(0)
+    assert next_feat.shape == (82,)
+    print("✓ forward_world OK")
 
-    if cf_action is not None:
-        print(f"✓ Kontrfaktyka wygenerowana: akcja={cf_action}, reward={cf_reward:.2f}")
-    else:
-        print("✓ Brak kontrfaktyki (prog nie osiagniety – to tez OK)")
+    target_q = np.random.randn(8)
+    nn.backward_q(target_q)
+    print("✓ backward_q OK")
 
-    print("=== UNIT 7 PASSED ===")
+    target_next = np.random.randn(82)
+    nn.backward_world(target_next, 1.0)
+    print("✓ backward_world OK")
+
+    print("\n=== UNIT 9: NeuralHybridBrain ===")
+    fe = FeatureExtractor(cfg)
+    brain = NeuralHybridBrain(cfg, fe)
+    feat = brain.get_features(np.random.randn(16), 1,1,0,0,0,0,0,1)
+    action, src, gate = brain.decide(feat, {}, None)
+    print(f"✓ decide -> {action.name}, {src}")
+
     print("[INTEG] SwarmCoreV55 DualLinear -- 20 krokow ...")
     for i in range(20):
         # Symulacja
