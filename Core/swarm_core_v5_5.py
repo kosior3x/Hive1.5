@@ -168,6 +168,12 @@ class SwarmConfig:
     L2_LEARNING_RATE: float = 0.001      # learning rate dla aproksymatora L2
     L2_UPDATE_FREQ: int = 1000           # co ile krokow aktualizowac statystyki waznosci
 
+    # Krystalizacja wiedzy L2 (Krok 3)
+    L2_FEATURES: int = 32                # liczba cech w warstwie L2
+    L2_MIN_SAMPLES: int = 5000           # minimalna liczba krokow przed krystalizacja
+    L2_LEARNING_RATE: float = 0.001      # learning rate dla aproksymatora L2
+    L2_UPDATE_FREQ: int = 1000           # co ile krokow aktualizowac statystyki waznosci
+
     # Bramka meta-warstwy (Krok 4)
     GATE_FEATURES: int = 16              # liczba cech wejsciowych bramki
     GATE_LEARNING_RATE: float = 0.005    # wyzszy LR — bramka uczy sie szybciej
@@ -1069,6 +1075,22 @@ class HybridBrain:
             weight_clip=10.0
         )
 
+        # L2 – warstwa skrystalizowana
+        self.l2_features = config.L2_FEATURES
+        self.l2_min_samples = config.L2_MIN_SAMPLES
+        self.l2_learning_rate = config.L2_LEARNING_RATE
+        self.l2_update_freq = config.L2_UPDATE_FREQ
+
+        self.importance_analyzer = FeatureImportanceAnalyzer(
+            n_features=self.n_features,
+            l2_features=self.l2_features
+        )
+        self.l2_approx = None  # powstanie po krystalizacji
+        self.l2_feature_indices = None
+        self.l2_samples_collected = 0
+        self.last_l2_update = 0
+        self.steps_since_train = 0
+
         self.normalizer = RunningNormalizer(self.n_features)
         self.replay_buffer = ReplayBuffer(capacity=config.REPLAY_BUFFER_CAPACITY)
         self.epsilon = config.EPSILON
@@ -1076,8 +1098,7 @@ class HybridBrain:
         self.last_features = None
         self.last_action = None
 
-        logger.info(f"HybridBrain: {self.n_features} features, DualLinearApproximator")
-
+        logger.info(f"HybridBrain: {self.n_features} features, DualLinearApproximator + L2 Analyzer")
     def get_features(self, lidar_16, us_left, us_right, encoder_l, encoder_r,
                      lorenz_x, lorenz_z, rear_bumper, min_dist, last_action=None,
                      free_angle=0.0, free_mag=0.0) -> np.ndarray:
@@ -1145,6 +1166,44 @@ class HybridBrain:
         best_idx = int(np.argmax(scores))
         return self.actions_list[best_idx], "Q_APPROX+INST+CONCEPT"
 
+    def crystallize_l2(self, force: bool = False):
+        """
+        Tworzy aproksymator L2 na podstawie najwazniejszych cech.
+        """
+        if self.l2_approx is not None and not force:
+            return  # juz skrystalizowane
+
+        indices = self.importance_analyzer.get_top_features(force=force)
+        if indices is None:
+            logger.info("L2: za malo danych do krystalizacji")
+            return
+
+        self.l2_feature_indices = indices
+        n_l2 = len(indices)
+
+        # Inicjalizacja nowego aproksymatora L2
+        self.l2_approx = DualLinearApproximator(
+            n_features=n_l2,
+            n_actions=self.n_actions,
+            learning_rate=self.l2_learning_rate,
+            avoidance_penalty=self.config.AVOIDANCE_PENALTY,
+            weight_clip=10.0
+        )
+
+        # Transfer wiedzy z L1 do L2 (dla wybranych cech)
+        # Mozemy skopiowac wagi Q i A dla odpowiednich cech
+        for a in range(self.n_actions):
+            self.l2_approx.q_weights[a] = self.q_approx.q_weights[a][indices]
+            self.l2_approx.a_weights[a] = self.q_approx.a_weights[a][indices]
+
+        logger.info(f"L2 skrystalizowana: {n_l2} cech, transfer wiedzy zakonczony")
+        self.importance_analyzer.freeze()
+
+    def predict_l2(self, full_features):
+        if self.l2_approx is None or self.l2_feature_indices is None:
+            return None
+        l2_features = full_features[self.l2_feature_indices]
+        return self.l2_approx.predict(l2_features)
     def update_q(self, old_features: np.ndarray, action: Action,
                  reward: float, new_features: np.ndarray,
                  source: str, lidar_min: float,
@@ -1153,7 +1212,7 @@ class HybridBrain:
 
         action_idx = self.actions_list.index(action)
 
-        # Czy to złe doświadczenie?
+        # Czy to zle doswiadczenie?
         is_bad, bad_target = self.is_bad_state(reward, source, action,
                                                 lidar_min, stagnant, oscillated)
 
@@ -1174,10 +1233,23 @@ class HybridBrain:
         self.lr = max(self.config.LR_MIN, self.lr * self.config.LR_DECAY)
         self.q_approx.set_learning_rate(self.lr)
 
+        self.steps_since_train += 1
+
+        # Aktualizacja analizatora waznosci (co l2_update_freq krokow)
+        if self.steps_since_train % self.l2_update_freq == 0:
+            self.importance_analyzer.update(
+                self.q_approx.q_weights,
+                self.q_approx.a_weights
+            )
+            self.l2_samples_collected += 1
+
+            if (self.l2_approx is None and
+                self.l2_samples_collected * self.l2_update_freq >= self.l2_min_samples):
+                self.crystallize_l2()
+
         # Replay Buffer nie jest tutaj aktywnie uzywany do treningu w tym kroku,
         # ale mozna go zachowac dla przyszlych krokow (np. World Model)
         self.replay_buffer.push(old_features, action_idx, reward, new_features, done)
-
 class DCMotorController:
     def __init__(self, config: SwarmConfig):
         self.config = config
@@ -1378,6 +1450,22 @@ class SwarmCoreV55:
             elif 'nn_W1' in saved:
                  logger.warning("Found old Neural Network weights - ignoring/resetting to DualLinear")
 
+            # L2 loading
+            if 'l2_q_weights' in saved and saved['l2_q_weights'] is not None:
+                try:
+                    self.brain.l2_feature_indices = np.array(saved['l2_feature_indices'])
+                    self.brain.l2_approx = DualLinearApproximator(
+                        n_features=len(self.brain.l2_feature_indices),
+                        n_actions=self.brain.n_actions,
+                        learning_rate=self.config.L2_LEARNING_RATE,
+                        avoidance_penalty=self.config.AVOIDANCE_PENALTY
+                    )
+                    self.brain.l2_approx.q_weights = np.array(saved['l2_q_weights'])
+                    self.brain.l2_approx.a_weights = np.array(saved['l2_a_weights'])
+                    logger.info(f"L2 zaladowana: {len(self.brain.l2_feature_indices)} cech")
+                except Exception as e:
+                    logger.error(f"Failed to load L2: {e}")
+
             norm_state = saved.get('normalizer_state')
             if norm_state and norm_state.get('n', 0) > 0:
                 saved_mean = np.array(norm_state['mean'])
@@ -1426,7 +1514,14 @@ class SwarmCoreV55:
             'concepts':         concepts_data,
             'lorenz_state':     self.lorenz.get_state(),
         }
+
+        if self.brain.l2_approx is not None:
+            data['l2_q_weights'] = self.brain.l2_approx.q_weights.tolist()
+            data['l2_a_weights'] = self.brain.l2_approx.a_weights.tolist()
+            data['l2_feature_indices'] = self.brain.l2_feature_indices.tolist()
+
         self.state_manager.save(data)
+
     def _compute_dynamic_safety(self, avg_speed: float) -> Tuple[float, float]:
         scale = self.config.SAFETY_DIST_SPEED_SCALE
         v = abs(avg_speed)
@@ -1820,6 +1915,9 @@ class SwarmCoreV55:
                            f"free_ang={math.degrees(free_angle):+.0f}deg mag={free_mag:.2f}")
             stag_info   = "STAGNANT!" if self.anti_stagnation.is_stagnant else "ok"
             q_vals      = self.brain.q_approx.predict_q(features)
+            l2_info = f"L2={self.brain.l2_approx is not None}"
+            if self.brain.l2_feature_indices is not None:
+                l2_info += f"({len(self.brain.l2_feature_indices)})"
             q_info      = (f"Q=[{np.min(q_vals):+.2f},{np.max(q_vals):+.2f}] "
                            f"Qnrm={np.linalg.norm(q_vals):.1f} "
                            f"eps={self.brain.epsilon:.3f} lr={self.brain.lr:.5f} "
@@ -1833,7 +1931,7 @@ class SwarmCoreV55:
                 f"Lmin={self.lidar.min_dist:.2f} "
                 f"act={final_action.name} src={source} "
                 f"{lorenz_info} {free_info} stag={stag_info} "
-                f"{q_info} {wm_info}"
+                f"{q_info} {l2_info} {wm_info}"
             )
 
 
@@ -1848,6 +1946,9 @@ class SwarmCoreV55:
             'cycle_count':       self.cycle_count,
             'q_weights_norm':    float(np.linalg.norm(self.brain.q_approx.q_weights)),
             'a_weights_norm':    float(np.linalg.norm(self.brain.q_approx.a_weights)),
+            'l2_exists':         self.brain.l2_approx is not None,
+            'l2_features':       len(self.brain.l2_feature_indices) if self.brain.l2_feature_indices is not None else 0,
+            'l2_samples':        self.brain.l2_samples_collected * self.brain.l2_update_freq,
             'epsilon':           self.brain.epsilon,
             'lr':                self.brain.lr,
             'replay_size':       len(self.brain.replay_buffer),
@@ -1874,6 +1975,16 @@ if __name__ == "__main__":
 
     cfg = SwarmConfig()
     core = SwarmCoreV55()
+
+    print("\n=== TEST 3: FeatureImportanceAnalyzer ===")
+    analyzer = FeatureImportanceAnalyzer(82, 32)
+    q_w = np.random.randn(8, 82)
+    a_w = np.random.randn(8, 82)
+    for _ in range(200):
+        analyzer.update(q_w, a_w)
+    indices = analyzer.get_top_features()
+    assert indices is not None and len(indices) == 32
+    print(f"✓ Analizator: wybrano {len(indices)} cech")
 
     print("[INTEG] SwarmCoreV55 DualLinear -- 20 krokow ...")
     for i in range(20):
