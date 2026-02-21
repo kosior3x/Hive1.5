@@ -190,7 +190,7 @@ class SwarmConfig:
     NN_HIDDEN_1: int = 32               # pierwsza warstwa ukryta (82 -> 32)
     NN_HIDDEN_2: int = 16               # druga warstwa ukryta (32 -> 16)
     NN_ACTIVATION: str = "relu"         # "relu" lub "tanh"
-    NN_LEARNING_RATE: float = 0.0001
+    NN_LEARNING_RATE: float = 0.00001
     NN_USE_L1_INIT: bool = True         # inicjalizuj W1 srednia z L1 (8x82)
     NN_USE_L2_INIT: bool = True         # inicjalizuj W2 srednia z L2 (8x32)
     NN_USE_A_INIT: bool = True          # inicjalizuj glowe A (jesli osobna)
@@ -1269,6 +1269,9 @@ class NeuralBrainWithImagination:
         a2 = np.maximum(0, z2)
         q = np.dot(a2, self.W_q) + self.b_q
 
+        # Clipping wartosci Q
+        q = np.clip(q, -5, 5)
+
         self.cache.update({
             'features': features,
             'z1': z1, 'a1': a1,
@@ -1344,9 +1347,10 @@ class NeuralBrainWithImagination:
             d_W_a = np.outer(a2, d_a)
             d_b_a = d_a
 
-            # Clip gradient
-            np.clip(d_W_a, -self.clip, self.clip, out=d_W_a)
-            np.clip(d_b_a, -self.clip, self.clip, out=d_b_a)
+            # Clip gradient A
+            grad_clip = 0.1
+            np.clip(d_W_a, -grad_clip, grad_clip, out=d_W_a)
+            np.clip(d_b_a, -grad_clip, grad_clip, out=d_b_a)
 
             # Update A weights
             self.W_a -= self.lr * d_W_a
@@ -1365,9 +1369,10 @@ class NeuralBrainWithImagination:
         d_W1 = np.outer(f, d_z1)                             # (82,32)
         d_b1 = d_z1
 
-        # Clip gradients
-        for g in [d_W_q, d_b_q, d_W2, d_b2, d_W1, d_b1]:
-             np.clip(g, -self.clip, self.clip, out=g)
+        # CLIPPING GRADIENTOW (Poprawka C)
+        grad_clip = 0.1
+        for grad in [d_W1, d_W2, d_W_q, d_b1, d_b2, d_b_q]:
+             np.clip(grad, -grad_clip, grad_clip, out=grad)
 
         # Aktualizacja SGD
         self.W_q -= self.lr * d_W_q
@@ -1376,6 +1381,10 @@ class NeuralBrainWithImagination:
         self.b2  -= self.lr * d_b2
         self.W1  -= self.lr * d_W1
         self.b1  -= self.lr * d_b1
+
+        # Clipping wag (pozostawiamy)
+        for w in (self.W1, self.W2, self.W_q):
+            np.clip(w, -self.clip, self.clip, out=w)
 
     def backward_world(self, target_next_features, target_reward):
         """Aktualizacja wag modelu swiata (nie rusza warstw wspolnych)."""
@@ -1397,14 +1406,18 @@ class NeuralBrainWithImagination:
         d_W_wm1 = np.outer(x, d_z_wm1)                       # (24,16)
         d_b_wm1 = d_z_wm1
 
-        # Clip gradients
-        for g in [d_W_wm2, d_b_wm2, d_W_wm1, d_b_wm1]:
-             np.clip(g, -self.clip, self.clip, out=g)
+        # CLIPPING GRADIENTOW (Poprawka D)
+        grad_clip = 0.1
+        for grad in [d_W_wm1, d_W_wm2, d_b_wm1, d_b_wm2]:
+             np.clip(grad, -grad_clip, grad_clip, out=grad)
 
         self.W_wm2 -= self.lr * d_W_wm2
         self.b_wm2 -= self.lr * d_b_wm2
         self.W_wm1 -= self.lr * d_W_wm1
         self.b_wm1 -= self.lr * d_b_wm1
+
+        np.clip(self.W_wm1, -self.clip, self.clip, out=self.W_wm1)
+        np.clip(self.W_wm2, -self.clip, self.clip, out=self.W_wm2)
 
     def generate_counterfactual(self, features, action_taken, actual_reward):
         """Zwraca (akcja, wartosc, nastepny stan) dla lepszej kontrfaktyki lub None."""
