@@ -20,6 +20,7 @@ ARCHITEKTURA:
 """
 
 import os
+import shutil
 import sys
 import time
 import logging
@@ -161,7 +162,6 @@ class SwarmConfig:
     # Avoidance learning (Krok 2)
     AVOIDANCE_PENALTY: float = 1.0       # sila wplywu macierzy A na decyzje (Q - penalty*A)
     AVOIDANCE_LR_SCALE: float = 1.0      # mnoznik LR dla macierzy A
-
     # Krystalizacja wiedzy L2 (Krok 3)
     L2_FEATURES: int = 32                # liczba cech w warstwie L2
     L2_MIN_SAMPLES: int = 5000           # minimalna liczba krokow przed krystalizacja
@@ -175,7 +175,7 @@ class SwarmConfig:
     GATE_TRAIN_START: int = 1000         # po ilu krokach zaczac uczyc bramke
     GATE_SOFTMAX_TEMP: float = 1.0       # temperatura softmax (1.0 = normalny)
 
-    # Model świata (Krok 5)
+    # Model swiata (Krok 5)
     WORLD_MODEL_FEATURES: int = 32         # liczba cech dla modelu swiata
     WORLD_MODEL_LEARNING_RATE: float = 0.001
     WORLD_MODEL_HIDDEN: int = 16           # rozmiar warstwy ukrytej
@@ -197,59 +197,8 @@ class SwarmConfig:
     NN_USE_GATE_INIT: bool = True       # inicjalizuj glowe gate
     NN_CLIP_GRAD: float = 5.0           # clipping gradientow
 
+
     # Krystalizacja wiedzy L2 (Krok 3)
-    L2_FEATURES: int = 32                # liczba cech w warstwie L2
-    L2_MIN_SAMPLES: int = 5000           # minimalna liczba krokow przed krystalizacja
-    L2_LEARNING_RATE: float = 0.001      # learning rate dla aproksymatora L2
-    L2_UPDATE_FREQ: int = 1000           # co ile krokow aktualizowac statystyki waznosci
-
-    # Bramka meta-warstwy (Krok 4)
-    GATE_FEATURES: int = 16              # liczba cech wejsciowych bramki
-    GATE_LEARNING_RATE: float = 0.005    # wyzszy LR — bramka uczy sie szybciej
-    GATE_UPDATE_FREQ: int = 1            # co ile krokow aktualizowac bramke (1 = kazdy)
-    GATE_TRAIN_START: int = 1000         # po ilu krokach zaczac uczyc bramke
-    GATE_SOFTMAX_TEMP: float = 1.0       # temperatura softmax (1.0 = normalny)
-
-    # Model świata (Krok 5)
-    WORLD_MODEL_FEATURES: int = 32         # liczba cech dla modelu swiata
-    WORLD_MODEL_LEARNING_RATE: float = 0.001
-    WORLD_MODEL_HIDDEN: int = 16           # rozmiar warstwy ukrytej
-    WORLD_MODEL_UPDATE_FREQ: int = 10      # co ile krokow aktualizowac model swiata
-    WORLD_MODEL_BATCH_SIZE: int = 64       # batch do treningu modelu swiata
-    WORLD_MODEL_BUFFER_SIZE: int = 10000   # bufor doswiadczen modelu swiata
-    COUNTERFACTUAL_STEPS: int = 3          # nieuzywane aktywnie w krok. 5, zostawiamy jako koncepcje
-    COUNTERFACTUAL_THRESHOLD: float = 0.5  # prog poprawy, by dodac kontrfaktyke
-    COUNTERFACTUAL_LR: float = 0.1         # jak bardzo kontrfaktyka wplywa na Q (waga)
-
-    # Neural Network (Krok 6)
-    NN_HIDDEN_1: int = 32               # pierwsza warstwa ukryta (82 -> 32)
-    NN_HIDDEN_2: int = 16               # druga warstwa ukryta (32 -> 16)
-    NN_ACTIVATION: str = "relu"         # "relu" lub "tanh"
-    NN_LEARNING_RATE: float = 0.0005
-    NN_USE_L1_INIT: bool = True         # inicjalizuj W1 srednia z L1 (8x82)
-    NN_USE_L2_INIT: bool = True         # inicjalizuj W2 srednia z L2 (8x32)
-    NN_USE_A_INIT: bool = True          # inicjalizuj glowe A (jesli osobna)
-    NN_USE_GATE_INIT: bool = True       # inicjalizuj glowe gate
-    NN_CLIP_GRAD: float = 5.0           # clipping gradientow
-
-    # Bramka meta-warstwy (Krok 4)
-    GATE_FEATURES: int = 16              # liczba cech wejsciowych bramki
-    GATE_LEARNING_RATE: float = 0.005    # wyzszy LR — bramka uczy sie szybciej
-    GATE_UPDATE_FREQ: int = 1            # co ile krokow aktualizowac bramke (1 = kazdy)
-    GATE_TRAIN_START: int = 1000         # po ilu krokach zaczac uczyc bramke
-    GATE_SOFTMAX_TEMP: float = 1.0       # temperatura softmax (1.0 = normalny)
-
-    # Model świata (Krok 5)
-    WORLD_MODEL_FEATURES: int = 32         # liczba cech dla modelu swiata
-    WORLD_MODEL_LEARNING_RATE: float = 0.001
-    WORLD_MODEL_HIDDEN: int = 16           # rozmiar warstwy ukrytej
-    WORLD_MODEL_UPDATE_FREQ: int = 10      # co ile krokow aktualizowac model swiata
-    WORLD_MODEL_BATCH_SIZE: int = 64       # batch do treningu modelu swiata
-    WORLD_MODEL_BUFFER_SIZE: int = 10000   # bufor doswiadczen modelu swiata
-    COUNTERFACTUAL_STEPS: int = 3          # nieuzywane aktywnie w krok. 5, zostawiamy jako koncepcje
-    COUNTERFACTUAL_LEARNING_RATE: float = 0.1 # wplyw kontrfaktyki na Q
-
-
 # =============================================================================
 # AKCJE
 # =============================================================================
@@ -1373,7 +1322,7 @@ class NeuralBrainWithImagination:
         })
         return next_features_pred, reward_pred
 
-    def backward_q(self, target_q):
+    def backward_q(self, target_q, target_a=None):
         """Aktualizacja wag dla Q i warstw wspolnych."""
         if 'features' not in self.cache: return
 
@@ -1387,7 +1336,23 @@ class NeuralBrainWithImagination:
         d_W_q = np.outer(a2, d_q)                            # (16,8)
         d_b_q = d_q
 
-        d_a2 = np.dot(d_q, self.W_q.T)                       # (16,)
+        # Avoidance gradient
+        d_a_out = 0
+        if target_a is not None and self.W_a is not None:
+            a_out = self.cache.get('a_out', self.forward_a())
+            d_a = a_out - target_a
+            d_W_a = np.outer(a2, d_a)
+            d_b_a = d_a
+
+            # Update A weights
+            self.W_a -= self.lr * d_W_a
+            self.b_a -= self.lr * d_b_a
+            np.clip(self.W_a, -self.clip, self.clip, out=self.W_a)
+
+            # Backprop through A head
+            d_a_out = np.dot(d_a, self.W_a.T) # (16,)
+
+        d_a2 = np.dot(d_q, self.W_q.T) + d_a_out             # (16,) + (16,)
         d_z2 = d_a2 * (z2 > 0)                               # ReLU grad
         d_W2 = np.outer(a1, d_z2)                            # (32,16)
         d_b2 = d_z2
@@ -1397,6 +1362,7 @@ class NeuralBrainWithImagination:
         d_W1 = np.outer(f, d_z1)                             # (82,32)
         d_b1 = d_z1
 
+        # Aktualizacja SGD
         self.W_q -= self.lr * d_W_q
         self.b_q -= self.lr * d_b_q
         self.W2  -= self.lr * d_W2
@@ -1404,6 +1370,7 @@ class NeuralBrainWithImagination:
         self.W1  -= self.lr * d_W1
         self.b1  -= self.lr * d_b1
 
+        # Clipping
         for w in (self.W1, self.W2, self.W_q):
             np.clip(w, -self.clip, self.clip, out=w)
 
@@ -1552,6 +1519,23 @@ class NeuralHybridBrain:
 
         return self.actions_list[best_idx], "NEURAL", gate_weights
 
+    def is_bad_state(self, reward: float, source: str, action: Action,
+                     lidar_min: float, stagnant: bool, oscillated: bool) -> Tuple[bool, float]:
+        # Kolizja / twardy odruch
+        if source in ("LIDAR_HARD_SAFETY", "HARD_REFLEX") and action != Action.REVERSE:
+            return True, 1.0   # chcemy, aby A dazylo do 1.0 (unikaj)
+        # Stagnacja (ale nie podczas skretu)
+        if stagnant and action in (Action.FORWARD, Action.REVERSE):
+            return True, 0.8
+        # Oscylacja
+        if oscillated:
+            return True, 0.6
+        # Niska nagroda
+        if reward < -1.0:
+            return True, 0.5
+        # Domyslnie – dobre doswiadczenie
+        return False, 0.0
+
     def update_q(self, old_features: np.ndarray, action: Action,
                  reward: float, new_features: np.ndarray,
                  source: str, lidar_min: float,
@@ -1567,6 +1551,21 @@ class NeuralHybridBrain:
         self.nn.forward_q(old_features)          # wypelnia cache
         self.nn.forward_world(action_idx)        # forward swiata
         self.nn.backward_world(new_features, reward)
+
+        # Uczenie Avoidance (natychmiastowe)
+        is_bad, target_a_val = self.is_bad_state(reward, source, action,
+                                                lidar_min, stagnant, oscillated)
+        if is_bad:
+            target_a = np.zeros(self.n_actions)
+            target_a[action_idx] = target_a_val
+            # Wymus forward A zeby miec cache
+            self.nn.forward_a()
+            # Uzyj backward_q tylko do aktualizacji A (przekazujac target_q jako obecne q zeby gradient d_q byl 0?)
+            # Nie, backward_q oblicza d_q = q - target_q.
+            # Jesli chcemy uczyc TYLKO A, to d_q powinno byc 0.
+            # Wiec target_q = q.
+            current_q = self.nn.cache['q']
+            self.nn.backward_q(current_q, target_a)
 
         # Generuj kontrfaktyke
         cf = self.nn.generate_counterfactual(old_features, action_idx, reward)
@@ -1886,47 +1885,65 @@ class SwarmCoreV55:
         logger.info(f"Target: {self.config.US_TARGET_DIST*100:.0f}cm")
         logger.info("=" * 70)
 
-    def _load_state(self):
-        saved = self.state_manager.load()
-        if saved:
-            # Brain weights are now handled by NeuralHybridBrain via .npz file
-            # so we skip loading weights from pickle here to avoid AttributeError.
-
-            # Load non-brain components
-            norm_state = saved.get('normalizer_state')
-            if norm_state and norm_state.get('n', 0) > 0 and hasattr(self.brain, 'normalizer'):
-                saved_mean = np.array(norm_state['mean'])
-                if len(saved_mean) == self.brain.n_features:
-                    self.brain.normalizer.set_state(norm_state)
-                    logger.info(f"Loaded normalizer: n={norm_state['n']} samples")
-
-            if hasattr(self.brain, 'epsilon'):
-                self.brain.epsilon = saved.get('epsilon', self.config.EPSILON)
-            if hasattr(self.brain, 'lr'):
-                self.brain.lr      = saved.get('lr', self.config.LEARNING_RATE)
-            if hasattr(self.brain, 'nn'):
-                self.brain.nn.lr   = self.brain.lr
-
-            saved_concepts = saved.get('concepts', {})
-            if saved_concepts:
-                for name, data in saved_concepts.items():
-                    c = Concept(data['name'], data['sequence'])
-                    c.activation    = data['activation']
-                    c.success_count = data['success_count']
-                    c.usage_count   = data['usage_count']
-                    c.context       = data.get('context', {})
-                    self.concept_graph.concepts[name] = c
-
-            lorenz_state = saved.get('lorenz_state')
-            if lorenz_state:
-                self.lorenz.x, self.lorenz.y, self.lorenz.z = lorenz_state
-
     def save_state(self):
-        # Delegate saving to the brain component which handles the new NPZ format
+        # 1. Zapisz wagi sieci (brain.save() juz to robi)
         if hasattr(self.brain, 'save'):
             self.brain.save()
         else:
             logger.warning("Brain does not have save method")
+
+        # 2. Przygotuj dane do pickle (koncepty, normalizer, Lorenz, epsilon, lr)
+        concepts_data = {}
+        for name, c in self.concept_graph.concepts.items():
+            concepts_data[name] = {
+                'name': c.name,
+                'sequence': c.sequence,
+                'activation': c.activation,
+                'success_count': c.success_count,
+                'usage_count': c.usage_count,
+                'context': c.context
+            }
+
+        data = {
+            'normalizer_state': self.brain.normalizer.get_state(),
+            'epsilon': self.brain.epsilon,
+            'lr': self.brain.lr,
+            'concepts': concepts_data,
+            'lorenz_state': self.lorenz.get_state(),
+        }
+
+        # 3. Zapisz do pliku pickle (uzywajac state_manager)
+        self.state_manager.save(data)
+
+    def _load_state(self):
+        saved = self.state_manager.load()
+        if saved:
+            # Wczytaj normalizer
+            norm_state = saved.get('normalizer_state')
+            if norm_state and norm_state.get('n', 0) > 0:
+                self.brain.normalizer.set_state(norm_state)
+                logger.info(f"Loaded normalizer: n={norm_state['n']} samples")
+
+            # Wczytaj epsilon i lr
+            self.brain.epsilon = saved.get('epsilon', self.config.EPSILON)
+            self.brain.lr = saved.get('lr', self.config.LEARNING_RATE)
+            self.brain.nn.lr = self.brain.lr
+
+            # Wczytaj koncepty
+            saved_concepts = saved.get('concepts', {})
+            if saved_concepts:
+                for name, data in saved_concepts.items():
+                    c = Concept(data['name'], data['sequence'])
+                    c.activation = data['activation']
+                    c.success_count = data['success_count']
+                    c.usage_count = data['usage_count']
+                    c.context = data.get('context', {})
+                    self.concept_graph.concepts[name] = c
+
+            # Wczytaj stan Lorenza
+            lorenz_state = saved.get('lorenz_state')
+            if lorenz_state:
+                self.lorenz.x, self.lorenz.y, self.lorenz.z = lorenz_state
 
     def _compute_dynamic_safety(self, avg_speed: float) -> Tuple[float, float]:
         scale = self.config.SAFETY_DIST_SPEED_SCALE
