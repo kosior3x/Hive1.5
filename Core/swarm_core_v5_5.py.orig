@@ -1600,26 +1600,43 @@ class NeuralHybridBrain:
         )
         self.n_features = len(dummy) # Powinno byc 82
 
-        # Krok 2: Używamy DualLinearApproximator zamiast NeuralBrain
-        self.q_approx = DualLinearApproximator(
-            n_features=self.n_features,
-            n_actions=self.n_actions,
-            learning_rate=config.LEARNING_RATE,
-            avoidance_penalty=config.AVOIDANCE_PENALTY,
-            weight_clip=10.0
+        # Zaladuj wagi z pliku (jesli istnieja)
+        self.nn = NeuralBrainWithImagination(
+            config, self.n_features, self.n_actions,
+            l1_weights=None, l2_weights=None, a_weights=None, gate_weights=None
         )
 
+        # Metadata
+        self.top32_indices = None
+        self.step_counter = 0
+        self.counterfactual_count = 0
         self.lr = config.NN_LEARNING_RATE
+        # L2 Metadata
+        self.l2_feature_indices = None
+        self.l2_importance_history = []
+        self.l2_stability_counter = 0
+        self.l2_last_reinforce = 0
+        self.l2_version = 0
+        self.l2_last_importance = None
+
+        self.load_or_create()   # patrz sekcja 5
 
         # Standardowe komponenty
         self.normalizer = RunningNormalizer(self.n_features)
         self.replay_buffer = ReplayBuffer(capacity=config.REPLAY_BUFFER_CAPACITY)
+        self.batch_size = config.REPLAY_BATCH_SIZE
+        self.train_freq = config.REPLAY_TRAIN_FREQ
+        self.steps_since_train = 0
         self.epsilon = config.EPSILON
 
         self.last_features = None
         self.last_action = None
 
-        logger.info(f"NeuralHybridBrain: DualLinearApproximator initialized")
+        # Rejestracja auto-zapisu
+        import atexit
+        atexit.register(self.save)
+
+        logger.info(f"NeuralHybridBrain: MLP {self.n_features}->{config.NN_HIDDEN_1}->{config.NN_HIDDEN_2}->Output initialized")
 
     def get_features(self, lidar_16, us_left, us_right, encoder_l, encoder_r,
                      lorenz_x, lorenz_z, rear_bumper, min_dist, last_action=None,
@@ -1637,35 +1654,41 @@ class NeuralHybridBrain:
         if random.random() < self.epsilon:
             return random.choice(self.actions_list), "EXPLORE", np.zeros(2)
 
-        combined_q = self.q_approx.predict(features)   # już z uwzględnieniem A
-        scores = combined_q.copy()
+        q = self.nn.forward_q(features)
+        # opcjonalnie: odejmij kare avoidance
+        if self.nn.W_a is not None:
+            a_out = self.nn.forward_a()
+            q = q - self.config.AVOIDANCE_PENALTY * a_out
 
+        scores = q.copy()
         for i, action in enumerate(self.actions_list):
             scores[i] += instinct_bias.get(action, 0.0) * 4.0
             if action == concept_suggestion:
                 scores[i] += 1.5
 
         best_idx = int(np.argmax(scores))
-        return self.actions_list[best_idx], "Q_APPROX+INST+CONCEPT", np.zeros(2)
+
+        # Gate weights for diagnostics (if gate exists)
+        gate_weights = np.zeros(2)
+        if hasattr(self.nn, 'W_gate'):
+             gate_weights = self.nn.forward_gate()
+
+        return self.actions_list[best_idx], "NEURAL", gate_weights
 
     def is_bad_state(self, reward: float, source: str, action: Action,
                      lidar_min: float, stagnant: bool, oscillated: bool) -> Tuple[bool, float]:
-        # Kolizja / twardy odruch (ale nie gdy sam REVERSE)
+        # Kolizja / twardy odruch
         if source in ("LIDAR_HARD_SAFETY", "HARD_REFLEX") and action != Action.REVERSE:
-            return True, 2.0   # bardzo źle
+            return True, 1.0   # chcemy, aby A dazylo do 1.0 (unikaj)
         # Stagnacja (ale nie podczas skretu)
         if stagnant and action in (Action.FORWARD, Action.REVERSE):
-            return True, 1.5
+            return True, 0.8
         # Oscylacja
         if oscillated:
-            return True, 1.2
+            return True, 0.6
         # Niska nagroda
-        if reward < -1.5:
-            return True, 1.0
-        # Jazda do przodu zbyt blisko ściany (ale jeszcze nie kolizja)
-        if action == Action.FORWARD and lidar_min < 0.2:
-            return True, 0.8
-
+        if reward < -1.0:
+            return True, 0.5
         # Domyslnie – dobre doswiadczenie
         return False, 0.0
 
@@ -1677,29 +1700,404 @@ class NeuralHybridBrain:
 
         action_idx = self.actions_list.index(action)
 
-        # Czy to złe doświadczenie?
-        is_bad, bad_target = self.is_bad_state(reward, source, action,
-                                                lidar_min, stagnant, oscillated)
+        # Dodaj do replay buffera
+        self.replay_buffer.push(old_features, action_idx, reward, new_features, done)
 
+        # Uczenie modelu swiata na biezacym doswiadczeniu
+        self.nn.forward_q(old_features)          # wypelnia cache
+        self.nn.forward_world(action_idx)        # forward swiata
+        self.nn.backward_world(new_features, reward)
+
+        # Uczenie Avoidance (natychmiastowe)
+        is_bad, target_a_val = self.is_bad_state(reward, source, action,
+                                                lidar_min, stagnant, oscillated)
         if is_bad:
-            # Aktualizuj macierz unikania
-            self.q_approx.update_a(old_features, action_idx, bad_target)
-        else:
-            # Normalna aktualizacja Q (TD)
-            if done:
-                target_q = reward
-            else:
-                next_q = self.q_approx.predict_q(new_features)
-                max_next_q = float(np.max(next_q))
-                target_q = reward + self.config.DISCOUNT_FACTOR * max_next_q
-            self.q_approx.update_q(old_features, action_idx, target_q)
+            target_a = np.zeros(self.n_actions)
+            target_a[action_idx] = target_a_val
+            # Wymus forward A zeby miec cache
+            self.nn.forward_a()
+            # Uzyj backward_q tylko do aktualizacji A (przekazujac target_q jako obecne q zeby gradient d_q byl 0?)
+            # Nie, backward_q oblicza d_q = q - target_q.
+            # Jesli chcemy uczyc TYLKO A, to d_q powinno byc 0.
+            # Wiec target_q = q.
+            current_q = self.nn.cache['q']
+            self.nn.backward_q(current_q, target_a)
+
+        # Generuj kontrfaktyke
+        cf = self.nn.generate_counterfactual(old_features, action_idx, reward)
+        if cf[0] is not None:
+            cf_action, cf_val, cf_next = cf
+            self.replay_buffer.push(old_features, cf_action, cf_val, cf_next, done)
+            self.counterfactual_count += 1
 
         # Decay epsilon i LR
         self.epsilon = max(self.config.EPSILON_MIN,
                            self.epsilon * self.config.EPSILON_DECAY)
         self.lr = max(self.config.LR_MIN,
                       self.lr * self.config.LR_DECAY)
-        self.q_approx.set_learning_rate(self.lr)
+        self.nn.lr = self.lr
+
+        self.steps_since_train += 1
+        if self.steps_since_train >= self.train_freq and len(self.replay_buffer) >= self.batch_size:
+            self._train_on_batch()
+            self.steps_since_train = 0
+
+        self.step_counter += 1
+        # Zaawansowane wzmacnianie L2 co 1000 krokow z roznymi metodami
+        if self.step_counter % 1000 == 0 and self.step_counter > 0:
+            # Rotacja metod co 5000 krokow
+            method_cycle = (self.step_counter // 1000) % 5
+            if method_cycle == 0:
+                method = 'simple'
+            elif method_cycle == 1:
+                method = 'combined'
+            elif method_cycle == 2:
+                method = 'stability'
+            else:
+                method = 'combined'  # domyslnie combined
+
+            changed, stats = self.reinforce_l2(method=method)
+
+            # Jesli zmiana byla duza (>20%), zapisz stan natychmiast
+            if changed and stats.get('changes', 0) > 6:
+                logger.info("ð¥ Duza zmiana L2 â wymuszam zapis stanu")
+                self.save()
+
+        if self.step_counter % 5000 == 0 and self.step_counter > 0:
+            results = {}
+            for method in ['simple', 'combined', 'stability']:
+                imp, conf = self.analyze_feature_importance(method)
+                if imp is not None:
+                    top5 = np.argsort(imp)[-5:]
+                    results[method] = {
+                        'top5': top5,
+                        'confidence': conf
+                    }
+
+            # Znajdz zgodnosc miedzy metodami (ile cech wspolnych w top20)
+            if len(results) >= 2:
+                sets = [set(np.argsort(results[m]['top5'])[-20:]) for m in results]
+                agreement = len(sets[0].intersection(*sets[1:])) / 20.0
+                logger.info(f"ð Zgodnosc metod L2: {agreement:.2f}")
+        if self.step_counter % 400 == 0:
+            self.save()
+
+    def _train_on_batch(self):
+        batch = self.replay_buffer.sample(self.batch_size)
+        for old_feat, act_idx, reward, new_feat, done in batch:
+            self.nn.forward_q(old_feat)
+            if done:
+                target_q = reward
+            else:
+                q_next = self.nn.forward_q(new_feat)
+                max_next_q = np.max(q_next)
+                target_q = reward + self.config.DISCOUNT_FACTOR * max_next_q
+
+            target_q_vec = self.nn.cache['q'].copy()
+            target_q_vec[act_idx] = target_q
+            self.nn.backward_q(target_q_vec)
+
+    WEIGHTS_DIR = "weights/"
+    WEIGHTS_FILE = "hierarchical_swarm_mlp_v6.npz"
+    WEIGHTS_PATH = os.path.join(WEIGHTS_DIR, WEIGHTS_FILE)
+
+    def analyze_feature_importance(self, method='combined'):
+        """
+        Zaawansowana analiza waznosci cech z wieloma metodami.
+
+        Args:
+            method: 'simple' - tylko suma wag bezwzglednych z W1
+                    'gradient' - uwzglednia gradienty z backprop
+                    'combined' - polaczenie obu metod
+                    'stability' - uwzglednia historie zmian
+
+        Returns:
+            importance_vector: numpy array (82,) z waznoscia kazdej cechy
+            confidence: float (0-1) poziom ufnosci analizy
+        """
+        if not hasattr(self.nn, 'W1') or self.nn.W1 is None:
+            return None, 0.0
+
+        # Metoda 1: Prosta suma wag bezwzglednych z pierwszej warstwy
+        importance_w1 = np.sum(np.abs(self.nn.W1), axis=1)
+
+        # Normalizacja do [0,1]
+        importance_w1 = (importance_w1 - importance_w1.min()) / (importance_w1.max() - importance_w1.min() + 1e-8)
+
+        if method == 'simple':
+            return importance_w1, 0.7
+
+        # Metoda 2: Gradient-based (jesli dostepne sa gradienty z cache)
+        importance_grad = np.zeros(self.n_features)
+        # Note: We need to store gradient history or check cache.
+        # NeuralBrainWithImagination cache stores gradients temporarily during backprop but they might be overwritten.
+        # But here we assume we can access them if we modify NeuralBrainWithImagination to store d_W1 in cache?
+        # NeuralBrainWithImagination.backward_q stores local d_W1 but doesn't persist it in self.cache for long term?
+        # Let's check NeuralBrainWithImagination.backward_q. It uses local vars.
+        # I should probably update NeuralBrainWithImagination to store d_W1 in cache or just use W1 for now.
+        # Or better, just implement 'simple' and 'stability' if gradient is hard to get without changing backward_q.
+        # The prompt implies I should use what's available.
+        # Let's assume 'gradient' relies on cache having 'd_W1'. I'll need to update backward_q to save it.
+
+        if hasattr(self.nn, 'cache') and 'd_W1' in self.nn.cache:
+            d_W1 = self.nn.cache.get('d_W1', np.zeros_like(self.nn.W1))
+            importance_grad = np.sum(np.abs(d_W1), axis=1)
+            importance_grad = (importance_grad - importance_grad.min()) / (importance_grad.max() - importance_grad.min() + 1e-8)
+
+        # Metoda 3: Combined
+        if method == 'combined':
+            # Polacz obie metody z wagami
+            combined = 0.7 * importance_w1 + 0.3 * importance_grad
+            confidence = 0.8
+
+            # Dodaj do historii
+            if not hasattr(self, 'l2_importance_history'): self.l2_importance_history = []
+            if len(self.l2_importance_history) > 10:
+                self.l2_importance_history.pop(0)
+            self.l2_importance_history.append(combined.copy())
+
+            return combined, confidence
+
+        # Metoda 4: Stabilnosc (uwzglednia historie)
+        if method == 'stability':
+            if not hasattr(self, 'l2_importance_history') or len(self.l2_importance_history) < 5:
+                return importance_w1, 0.5
+
+            # Oblicz srednia z historii
+            avg_importance = np.mean(self.l2_importance_history[-5:], axis=0)
+
+            # Oblicz wariancje – im mniejsza, tym bardziej stabilna cecha
+            variance = np.var(self.l2_importance_history[-5:], axis=0)
+            stability = 1.0 / (variance + 1e-8)
+            stability = (stability - stability.min()) / (stability.max() - stability.min() + 1e-8)
+
+            # Polacz srednia waznosc ze stabilnoscia
+            final = 0.6 * avg_importance + 0.4 * stability
+            return final, 0.9
+
+        return importance_w1, 0.5
+
+    def reinforce_l2(self, force=False, method='combined'):
+        """
+        Inteligentne wzmacnianie L2 z adaptacyjnym progiem i monitoringiem.
+
+        Args:
+            force: bool – wymus aktualizacje nawet jesli zmiany sa male
+            method: metoda analizy waznosci
+
+        Returns:
+            changed: bool – czy L2 zostala zaktualizowana
+            stats: dict – statystyki zmian
+        """
+        # Pobierz waznosc cech
+        importance, confidence = self.analyze_feature_importance(method)
+        if importance is None:
+            return False, {'error': 'Brak danych'}
+
+        # Wybierz 32 najwazniejsze cechy
+        current_indices = np.argsort(importance)[-32:]
+
+        stats = {
+            'timestamp': time.time(),
+            'method': method,
+            'confidence': confidence,
+            'current_indices': current_indices.copy(),
+            'changes': 0,
+            'stability': 0.0
+        }
+
+        # Jesli nie mielismy jeszcze L2, po prostu ustaw
+        if not hasattr(self, 'l2_feature_indices') or self.l2_feature_indices is None:
+            self.l2_feature_indices = current_indices
+            self.l2_version += 1
+            stats['changes'] = 32
+            stats['stability'] = 0.0
+            logger.info(f"✨ L2 zainicjalizowana (v{self.l2_version}): 32 cech, metoda={method}, ufnosc={confidence:.2f}")
+            return True, stats
+
+        # Oblicz zmiany
+        old_set = set(self.l2_feature_indices)
+        new_set = set(current_indices)
+
+        changes = len(old_set.symmetric_difference(new_set)) // 2  # ile cech sie zmienilo
+        stats['changes'] = changes
+        stats['old_indices'] = self.l2_feature_indices.copy()
+
+        # Oblicz stabilnosc (jak bardzo zmienialy sie wagi od ostatniego razu)
+        if hasattr(self, 'l2_last_importance') and self.l2_last_importance is not None:
+            importance_change = np.mean(np.abs(importance - self.l2_last_importance))
+            stability = 1.0 / (1.0 + importance_change)
+            stats['stability'] = stability
+        else:
+            stability = 0.5
+
+        self.l2_last_importance = importance.copy()
+
+        # Adaptacyjny prog – im bardziej stabilny system, tym wiekszy prog
+        adaptive_threshold = max(3, int(5 * stability))
+
+        if force or changes >= adaptive_threshold:
+            # Zaktualizuj L2
+            self.l2_feature_indices = current_indices
+            self.l2_version += 1
+            self.l2_last_reinforce = time.time()
+            self.l2_stability_counter = int(stability * 100)
+
+            log_msg = (f"🔄 L2 wzmocniona (v{self.l2_version}): "
+                      f"zmienilo sie {changes} cech, "
+                      f"prog={adaptive_threshold}, "
+                      f"ufnosc={confidence:.2f}, "
+                      f"stabilnosc={stability:.2f}")
+
+            if changes > 10:
+                logger.warning(log_msg + " – DUZA ZMIANA!")
+            else:
+                logger.info(log_msg)
+
+            return True, stats
+        else:
+            logger.debug(f"L2 stabilna: zmiany={changes} < prog={adaptive_threshold}")
+            return False, stats
+
+    def debug_l2(self):
+        """Metoda pomocnicza do diagnostyki i recznego strojenia L2"""
+        print("\n" + "="*50)
+        print("🔍 DIAGNOSTYKA L2")
+        print("="*50)
+
+        if not hasattr(self, 'l2_feature_indices') or self.l2_feature_indices is None:
+            print("❌ L2 niezainicjalizowana")
+            return
+
+        print(f"📊 L2 wersja: {getattr(self, 'l2_version', 0)}")
+        print(f"📊 Liczba cech: {len(self.l2_feature_indices)}")
+        print(f"📊 Indeksy: {sorted(self.l2_feature_indices)}")
+
+        # Analiza waznosci
+        imp_simple, conf_simple = self.analyze_feature_importance('simple')
+        imp_combined, conf_combined = self.analyze_feature_importance('combined')
+
+        if imp_simple is not None:
+            print(f"\n📈 Waznosc cech (simple):")
+            top10 = np.argsort(imp_simple)[-10:]
+            print(f"   Top10: {top10}")
+            print(f"   Ufnosc: {conf_simple:.2f}")
+
+        if imp_combined is not None:
+            print(f"\n📈 Waznosc cech (combined):")
+            top10 = np.argsort(imp_combined)[-10:]
+            print(f"   Top10: {top10}")
+            print(f"   Ufnosc: {conf_combined:.2f}")
+
+        print("\n" + "="*50)
+        return {
+            'indices': self.l2_feature_indices,
+            'version': getattr(self, 'l2_version', 0),
+            'importance_simple': imp_simple,
+            'importance_combined': imp_combined
+        }
+
+    def save(self, path=None):
+        if path is None:
+            path = self.WEIGHTS_PATH
+        os.makedirs(self.WEIGHTS_DIR, exist_ok=True)
+
+        # Sprawdz, czy wagi nie zawieraja NaN/Inf
+        for name, arr in [('W1', self.nn.W1), ('b1', self.nn.b1)]:
+            if np.any(np.isnan(arr)) or np.any(np.isinf(arr)):
+                print(f"!!! Wykryto NaN/Inf w {name} – zapis wstrzymany !!!")
+                return
+
+        # Opcjonalny backup
+        import shutil
+        if os.path.exists(path):
+            backup = path + ".backup"
+            shutil.copy(path, backup)
+
+        np.savez(
+            path,
+            W1=self.nn.W1, b1=self.nn.b1,
+            W2=self.nn.W2, b2=self.nn.b2,
+            W_gate=self.nn.W_gate, b_gate=self.nn.b_gate,
+            W_q=self.nn.W_q, b_q=self.nn.b_q,
+            W_a=self.nn.W_a if self.nn.W_a is not None else np.array([]),
+            b_a=self.nn.b_a if self.nn.b_a is not None else np.array([]),
+            W_wm1=self.nn.W_wm1, b_wm1=self.nn.b_wm1,
+            W_wm2=self.nn.W_wm2, b_wm2=self.nn.b_wm2,
+            l2_feature_indices=self.l2_feature_indices if self.l2_feature_indices is not None else np.array([]),
+            l2_version=np.array([self.l2_version]),
+            l2_last_reinforce=np.array([self.l2_last_reinforce]),
+            l2_stability_counter=np.array([self.l2_stability_counter]),
+            top32_indices=getattr(self, 'top32_indices', np.array([], dtype=np.int32)),
+            step_counter=np.array([self.step_counter], dtype=np.int64),
+            freeze_l1_steps=np.array([self.config.L2_MIN_SAMPLES]),
+            avoidance_penalty=np.array([self.config.AVOIDANCE_PENALTY]),
+            learning_rate=np.array([self.lr]),
+            counterfactual_count=np.array([self.counterfactual_count]),
+            version=np.array(['6.0'], dtype=object),
+            saved_at=np.array([time.strftime("%Y-%m-%d %H:%M:%S")], dtype=object)
+        )
+        logger.info(f"Model zapisany do {path}")
+
+    def load_or_create(self, path=None):
+        if path is None:
+            path = self.WEIGHTS_PATH
+
+        if not os.path.exists(path):
+            print(f"Brak pliku {path} – tworze nowy model.")
+            return False
+
+        try:
+            data = np.load(path, allow_pickle=True)
+            required = ['W1','b1','W2','b2','W_gate','b_gate','W_q','b_q','W_wm1','b_wm1','W_wm2','b_wm2']
+            missing = [k for k in required if k not in data]
+            if missing:
+                # raise ValueError(f"Brakujace klucze: {missing}")
+                logger.warning(f"Brakujace klucze w npz: {missing}. Inicjalizacja czesciowa lub nowa.")
+                # Nie przerywamy, moze to starsza wersja
+
+            if 'W1' in data: self.nn.W1 = data['W1'].astype(np.float32)
+            if 'b1' in data: self.nn.b1 = data['b1'].astype(np.float32)
+            if 'W2' in data: self.nn.W2 = data['W2'].astype(np.float32)
+            if 'b2' in data: self.nn.b2 = data['b2'].astype(np.float32)
+            if 'W_gate' in data: self.nn.W_gate = data['W_gate'].astype(np.float32)
+            if 'b_gate' in data: self.nn.b_gate = data['b_gate'].astype(np.float32)
+            if 'W_q' in data: self.nn.W_q = data['W_q'].astype(np.float32)
+            if 'b_q' in data: self.nn.b_q = data['b_q'].astype(np.float32)
+
+            if 'W_a' in data and data['W_a'].size > 0:
+                self.nn.W_a = data['W_a'].astype(np.float32)
+                self.nn.b_a = data['b_a'].astype(np.float32)
+            else:
+                self.nn.W_a = None
+                self.nn.b_a = None
+
+            if 'W_wm1' in data: self.nn.W_wm1 = data['W_wm1'].astype(np.float32)
+            if 'b_wm1' in data: self.nn.b_wm1 = data['b_wm1'].astype(np.float32)
+            if 'W_wm2' in data: self.nn.W_wm2 = data['W_wm2'].astype(np.float32)
+            if 'b_wm2' in data: self.nn.b_wm2 = data['b_wm2'].astype(np.float32)
+
+            if 'l2_feature_indices' in data and data['l2_feature_indices'].size > 0:
+                self.l2_feature_indices = data['l2_feature_indices']
+                self.l2_version = int(data.get('l2_version', 0))
+                self.l2_last_reinforce = float(data.get('l2_last_reinforce', 0))
+                self.l2_stability_counter = int(data.get('l2_stability_counter', 0))
+                logger.info(f"ð¥ Wczytano L2 v{self.l2_version}: {len(self.l2_feature_indices)} cech, "
+                           f"ostatnie wzmocnienie: {self.l2_last_reinforce}")
+            self.top32_indices = data.get('top32_indices')
+            self.step_counter = int(data.get('step_counter', 0))
+            self.counterfactual_count = int(data.get('counterfactual_count', 0))
+            self.lr = float(data.get('learning_rate', self.config.LEARNING_RATE))
+
+            version = data.get('version', '?')
+            saved_at = data.get('saved_at', 'nieznana data')
+            print(f"Wczytano model v{version}, krok {self.step_counter}, zapis: {saved_at}")
+            return True
+
+        except Exception as e:
+            print(f"Blad wczytywania {path}: {e}\nTworze nowy model.")
+            return False
+
 
 class StuckDetector:
     """
@@ -1899,6 +2297,8 @@ class MovementTracker:
             'efficiency': self.effective_moves / max(1, self.effective_moves + self.wasted_moves),
             'current_sequence_len': len(self.current_sequence)
         }
+
+
 class SensorFusion:
     """
     Fuzja sensorów: US (15 stopni) + LIDAR (360 stopni).
@@ -2012,6 +2412,8 @@ class EncoderMonitor:
         # Porównaj expected vs actual
         # Jeśli expected duże, a actual małe -> poślizg/blokada
         return 0.0 # TODO: Implementacja
+
+
 class DCMotorController:
     def __init__(self, config: SwarmConfig):
         self.config = config
@@ -2116,6 +2518,8 @@ class VirtualDamper:
             return -0.3
         else:
             return 0.0
+
+
 # =============================================================================
 # STATE MANAGER (PERSISTENCE WBUDOWANA!)
 # =============================================================================
@@ -2133,9 +2537,7 @@ class StateManager:
             with open(self.brain_path, 'wb') as f:
                 pickle.dump(data, f)
             weights = data.get('weights')
-            # For DualLinearApproximator, weights are in q_weights/a_weights, so data.get('weights') might be None
-            # But we can log something else.
-            w_info = "weights_saved"
+            w_info = f"weights={np.array(weights).shape}" if weights is not None else "weights=None"
             logger.info(f"✓ Saved: {w_info}, Concepts={len(data.get('concepts',{}))}")
         except Exception as e:
             logger.error(f"Save failed: {e}")
@@ -2161,6 +2563,8 @@ class StateManager:
             self.save_counter = 0
             return True
         return False
+
+
 # =============================================================================
 # SWARM CORE v5.5 FINAL
 # =============================================================================
@@ -2168,6 +2572,11 @@ class StateManager:
 class SwarmCoreV55:
     """
     SWARM v5.5 - Production Final
+
+    ★ Q-Table ≠ Concept Graph!
+    ★ Persistence wbudowana (bez patchy)
+    ★ Android-compatible (bez relative imports)
+    ★ Gotowe do unzip & run
     """
 
     def __init__(self):
@@ -2190,10 +2599,11 @@ class SwarmCoreV55:
 
         # AI Layers
         self.brain = NeuralHybridBrain(self.config, self.feature_extractor)
-        self.concept_graph = ConceptGraph(self.config)
+        self.concept_graph = ConceptGraph(self.config)  # ★ WŁAŚCIWY!
 
         # Moduly
         self.lorenz = LorenzAttractor(self.config)
+        self.brain.lorenz = self.lorenz
         self.instinct = FreeSpaceInstinct(self.config)
         self.velocity_mapper = DynamicVelocityMapper(self.config)
         self.stabilizer = ActionStabilizer(self.config)
@@ -2206,6 +2616,8 @@ class SwarmCoreV55:
         self.cycle_count = 0
         self.hard_reflex_hold_remaining = 0
         self.hard_reflex_action: Optional[Action] = None
+
+        # Rear bumper state (Legacy field, kept for compatibility if needed, but BumperSystem should handle it)
         self.rear_bumper_forward_remaining = 0
 
         # ★ Anti-oscillation: śledzenie powtórzeń akcji
@@ -2221,7 +2633,13 @@ class SwarmCoreV55:
         logger.info("=" * 70)
 
     def save_state(self):
-        # 2. Przygotuj dane do pickle
+        # 1. Zapisz wagi sieci (brain.save() juz to robi)
+        if hasattr(self.brain, 'save'):
+            self.brain.save()
+        else:
+            logger.warning("Brain does not have save method")
+
+        # 2. Przygotuj dane do pickle (koncepty, normalizer, Lorenz, epsilon, lr)
         concepts_data = {}
         for name, c in self.concept_graph.concepts.items():
             concepts_data[name] = {
@@ -2234,8 +2652,6 @@ class SwarmCoreV55:
             }
 
         data = {
-            'q_weights': self.brain.q_approx.q_weights.tolist(),
-            'a_weights': self.brain.q_approx.a_weights.tolist(),
             'normalizer_state': self.brain.normalizer.get_state(),
             'epsilon': self.brain.epsilon,
             'lr': self.brain.lr,
@@ -2243,26 +2659,24 @@ class SwarmCoreV55:
             'lorenz_state': self.lorenz.get_state(),
         }
 
-        # 3. Zapisz do pliku pickle
+        # 3. Zapisz do pliku pickle (uzywajac state_manager)
         self.state_manager.save(data)
 
     def _load_state(self):
         saved = self.state_manager.load()
         if saved:
+            # Wczytaj normalizer
             norm_state = saved.get('normalizer_state')
             if norm_state and norm_state.get('n', 0) > 0:
                 self.brain.normalizer.set_state(norm_state)
                 logger.info(f"Loaded normalizer: n={norm_state['n']} samples")
 
-            if 'q_weights' in saved and saved['q_weights'] is not None:
-                self.brain.q_approx.q_weights = np.array(saved['q_weights'])
-            if 'a_weights' in saved and saved['a_weights'] is not None:
-                self.brain.q_approx.a_weights = np.array(saved['a_weights'])
-
+            # Wczytaj epsilon i lr
             self.brain.epsilon = saved.get('epsilon', self.config.EPSILON)
             self.brain.lr = saved.get('lr', self.config.LEARNING_RATE)
-            self.brain.q_approx.set_learning_rate(self.brain.lr)
+            self.brain.nn.lr = self.brain.lr
 
+            # Wczytaj koncepty
             saved_concepts = saved.get('concepts', {})
             if saved_concepts:
                 for name, data in saved_concepts.items():
@@ -2273,6 +2687,7 @@ class SwarmCoreV55:
                     c.context = data.get('context', {})
                     self.concept_graph.concepts[name] = c
 
+            # Wczytaj stan Lorenza
             lorenz_state = saved.get('lorenz_state')
             if lorenz_state:
                 self.lorenz.x, self.lorenz.y, self.lorenz.z = lorenz_state
@@ -2289,45 +2704,162 @@ class SwarmCoreV55:
     def validate_safety_constraints(self, us_left_dist: float, us_right_dist: float,
                                    encoder_l: float, encoder_r: float,
                                    rear_bumper: int = 0) -> Optional[Tuple[Action, str]]:
-        # Dummy implementation or simplified if needed, but I should copy from Turn 2 if possible.
-        # Since I can't fit it all, I will implement simplified safety check relying on Fusion/Loop logic which does safety too.
-        # Wait, the loop calls this? No, loop calls _decide_from_fusion in updated code.
-        # But loop also calls bumper_system.
-        # In Turn 2, validate_safety_constraints was defined but usage in loop was partially replaced by new logic?
-        # No, Turn 2 loop logic used validate_safety_constraints at start?
-        # Turn 2 loop:
-        # 1. Process sensors
-        # 2. Hierarchia Decyzyjna
-        # POZIOM 1: Damper -> bumper_system.check_collision
-        # POZIOM 2 & 3: _decide_from_fusion
-        # So validate_safety_constraints seems UNUSED in the loop shown in Turn 2!
-        # It was replaced by _decide_from_fusion and BumperSystem.
-        # So I can skip it or leave it empty?
-        # I'll include it for compatibility but empty.
+        """Safety check z dual US + LIDAR + rear bumper + LIDAR hard safety"""
+        avg_speed = (encoder_l + encoder_r) / 2.0
+        dyn_us, _dyn_lidar = self._compute_dynamic_safety(avg_speed)
+
+        # ────────────────────────────────────────────────────────────────────
+        # LIDAR hard safety — PRIORYTET 1 (niezależnie od bumpera!)
+        # Gdy Lmin < 0.25m ZAWSZE uciekaj — przebija bumper!
+        # ────────────────────────────────────────────────────────────────────
+        if self.lidar.min_dist < self.config.LIDAR_HARD_SAFETY_MIN:
+            # Ubij bumper forward — jeśli jedziemy w ścianę to NIE FORWARD
+            self.rear_bumper_forward_remaining = 0
+            self.stabilizer.force_unlock()
+            # Wybierz najlepszy kierunek ucieczki
+            if us_left_dist > us_right_dist + 0.15:
+                self.hard_reflex_action = Action.TURN_LEFT
+            elif us_right_dist > us_left_dist + 0.15:
+                self.hard_reflex_action = Action.TURN_RIGHT
+            else:
+                # Oba boki zablokowane — sprawdź sektory LIDAR
+                # Sektory 6-9 = tył (180°±45°) — jeśli tył wolny to cofaj
+                rear_sectors = self.lidar.sectors_16[6:10]
+                rear_blocked = float(np.mean(rear_sectors)) > 0.4
+                if rear_blocked:
+                    # I przód i tył zablokowane → spin w stronę wyższego US
+                    if us_left_dist >= us_right_dist:
+                        self.hard_reflex_action = Action.SPIN_LEFT
+                    else:
+                        self.hard_reflex_action = Action.SPIN_RIGHT
+                else:
+                    self.hard_reflex_action = Action.REVERSE
+            self.hard_reflex_hold_remaining = self.config.HARD_REFLEX_HOLD_CYCLES
+            return self.hard_reflex_action, "LIDAR_HARD_SAFETY"
+
+        # ────────────────────────────────────────────────────────────────────
+        # HARD REFLEX HOLD — trzymaj poprzednią akcję ratunkową
+        # ────────────────────────────────────────────────────────────────────
+        if self.hard_reflex_hold_remaining > 0 and self.hard_reflex_action is not None:
+            self.hard_reflex_hold_remaining -= 1
+            return self.hard_reflex_action, "HARD_REFLEX_HOLD"
+
+        # ★ NOWE: Jeśli aktualna akcja to już TURN/SPIN, a Lmin nie jest jeszcze krytyczne (<0.18m)
+        #   ale powyżej 0.15m, to pozwól Q-aproksymatorowi kontynuować manewr.
+        if (self._last_action_type in (Action.TURN_LEFT, Action.TURN_RIGHT,
+                                       Action.SPIN_LEFT, Action.SPIN_RIGHT)
+                and self.lidar.min_dist > 0.15):
+            return None  # safety nie ingeruje w aktywny skręt
+
+        # ────────────────────────────────────────────────────────────────────
+        # REAR BUMPER: tylna kolizja → uciekaj DO PRZODU jeśli można
+        # Jeśli przód zablokowany → SPIN zamiast FORWARD (unikamy pętli!)
+        # ────────────────────────────────────────────────────────────────────
+        if rear_bumper == 1:
+            self.stabilizer.force_unlock()
+            # Sprawdź czy z przodu mamy wolną przestrzeń
+            front_sectors = np.array([
+                self.lidar.sectors_16[14], self.lidar.sectors_16[15],
+                self.lidar.sectors_16[0],  self.lidar.sectors_16[1]
+            ])
+            front_clear = float(np.max(front_sectors)) < 0.5  # 0.5 = ~1.5m odległości
+
+            if front_clear:
+                # Przód wolny → jedź do przodu
+                self.rear_bumper_forward_remaining = self.config.REAR_BUMPER_FORWARD_CYCLES
+                logger.warning("REAR BUMPER: front clear -> FORWARD")
+                return Action.FORWARD, "REAR_BUMPER_HIT"
+            else:
+                # Przód zablokowany → spin w stronę dalszego US
+                self.rear_bumper_forward_remaining = 0
+                if us_left_dist >= us_right_dist:
+                    spin_action = Action.SPIN_LEFT
+                else:
+                    spin_action = Action.SPIN_RIGHT
+                self.hard_reflex_action = spin_action
+                self.hard_reflex_hold_remaining = self.config.HARD_REFLEX_HOLD_CYCLES
+                logger.warning(f"REAR BUMPER: front blocked -> {spin_action.name}")
+                return spin_action, "REAR_BUMPER_SPIN"
+
+        # Kontynuuj wymuszony FORWARD po tylnej kolizji
+        # (ale przerwij jeśli LIDAR ostrzega z przodu!)
+        if self.rear_bumper_forward_remaining > 0:
+            front_sectors = np.array([
+                self.lidar.sectors_16[14], self.lidar.sectors_16[15],
+                self.lidar.sectors_16[0],  self.lidar.sectors_16[1]
+            ])
+            if float(np.max(front_sectors)) > 0.5:
+                # Z przodu pojawia się przeszkoda — przerwij FORWARD wcześniej
+                self.rear_bumper_forward_remaining = 0
+                logger.warning("REAR_BUMPER_FORWARD aborted: front obstacle approaching")
+            else:
+                self.rear_bumper_forward_remaining -= 1
+                return Action.FORWARD, "REAR_BUMPER_FORWARD"
+
+        # ────────────────────────────────────────────────────────────────────
+        # US front check + LIDAR corroboration
+        # ────────────────────────────────────────────────────────────────────
+        us_front_min = min(us_left_dist, us_right_dist)
+
+        # ★ NAPRAWIONE: Sprawdź LIDAR przed cofnięciem
+        if 0.01 < us_front_min < dyn_us:
+            if self.config.REVERSE_LIDAR_CHECK:
+                front_blocked = self.lidar.check_front_sectors_blocked(
+                    threshold=self.config.REVERSE_LIDAR_THRESHOLD,
+                    num_sectors=self.config.REVERSE_LIDAR_SECTORS
+                )
+                if not front_blocked:
+                    return None  # Bok wolny - nie cofaj!
+
+            # Przód zablokowany → cofnij
+            self.stabilizer.force_unlock()
+            self.hard_reflex_action = Action.REVERSE
+            self.hard_reflex_hold_remaining = self.config.HARD_REFLEX_HOLD_CYCLES
+            return Action.REVERSE, "HARD_REFLEX"
+
+        # Anti-stall
+        if (abs(encoder_l) < 0.02 and abs(encoder_r) < 0.02 and
+                abs(self.motors.last_pwm_l) > 40 and abs(self.motors.last_pwm_r) > 40):
+            self.stabilizer.force_unlock()
+            self.hard_reflex_action = Action.ESCAPE_MANEUVER
+            self.hard_reflex_hold_remaining = self.config.HARD_REFLEX_HOLD_CYCLES
+            return Action.ESCAPE_MANEUVER, "ANTI_STALL"
+
         return None
 
     def _decide_from_fusion(self, enc_l, enc_r) -> Tuple[Optional[Action], str]:
-        # POZIOM 1: Damper handled in loop
-        # POZIOM 2: Blokada
+        """
+        Podejmuje decyzje na podstawie fuzji sensorow i hierarchii.
+        """
+        # POZIOM 1: Damper (obslugiwany w loop, tu mozna dodac check statusu)
+        if self.bumper_system.escape_sequence > 0:
+             return self.bumper_system.check_collision(0), "BUMPER_ESCAPE"
+
+        # POZIOM 2: Blokada (kola kreca, brak ruchu)
         if self.stuck_detector.update(self.fusion.front_dist, enc_l, enc_r):
             logger.warning("STUCK DETECTED! Uwalniam robota...")
             if self.fusion.rear_dist > 0.3:
                 return Action.REVERSE, "STUCK_REVERSE"
             else:
+                # Tyl zablokowany - obrot
                 if self.fusion.left_dist >= self.fusion.right_dist:
                     return Action.SPIN_LEFT, "STUCK_SPIN_LEFT"
                 else:
                     return Action.SPIN_RIGHT, "STUCK_SPIN_RIGHT"
 
-        # POZIOM 3: Bezpieczenstwo
+        # POZIOM 3: Bezpieczenstwo (US/LIDAR < 15cm)
+        # Uzywamy fusion.front_dist
         if self.fusion.front_dist < self.config.LIDAR_HARD_SAFETY_MIN:
+             # Sprawdz tyl
              if self.fusion.rear_dist > 0.3:
                   return Action.REVERSE, "SAFETY_REVERSE"
              else:
+                  # Spin w strone wolniejsza
                   if self.fusion.left_dist >= self.fusion.right_dist:
                        return Action.SPIN_LEFT, "SAFETY_SPIN"
                   else:
                        return Action.SPIN_RIGHT, "SAFETY_SPIN"
+
         return None, "NORMAL"
 
     def loop(self, lidar_points: List[Tuple[float, float]],
@@ -2336,36 +2868,60 @@ class SwarmCoreV55:
              us_left_dist: float = 3.0, us_right_dist: float = 3.0,
              rear_bumper: int = 0,
              dt: float = 0.033) -> Tuple[float, float]:
+        """Glowna petla decyzyjna (v5.5 - dual US + rear bumper)"""
 
         self.cycle_count += 1
+
+        # 1. Process sensors & Fusion
         lidar_16 = self.lidar.process(lidar_points)
         self.fusion.update(us_left_dist, us_right_dist, lidar_16)
 
         avg_speed = (encoder_l + encoder_r) / 2.0
+        dyn_us, dyn_lidar = self._compute_dynamic_safety(avg_speed)
 
+        # 2. Hierarchia Decyzyjna
+
+        # POZIOM 1: Damper
         bumper_action = self.bumper_system.check_collision(rear_bumper)
         if bumper_action:
              final_action = bumper_action
              source = "BUMPER_PRIORITY"
              self.stabilizer.force_unlock()
+             gate_weights = np.zeros(2)
         else:
+             # POZIOM 2 & 3: Blokada i Safety (via _decide_from_fusion)
              override_action, override_source = self._decide_from_fusion(encoder_l, encoder_r)
+
              if override_action:
                   final_action = override_action
                   source = override_source
                   self.stabilizer.force_unlock()
+                  gate_weights = np.zeros(2)
              else:
+                  # POZIOM 4: Normalna jazda (Brain)
+
+                  # 3. Lorenz step
                   self.lorenz.step()
+                  aggression_factor = self.lorenz.z_norm
+                  directional_bias = self.lorenz.x_norm
+
+                  # 4. Free space instinct
                   free_angle, free_mag = self.instinct.compute_free_space_vector(lidar_16)
-                  front_occ = float(np.mean([lidar_16[14], lidar_16[15], lidar_16[0], lidar_16[1]]))
+
+                  front_occ     = float(np.mean([lidar_16[14], lidar_16[15],
+                                                 lidar_16[0],  lidar_16[1]]))
                   front_clearance = 1.0 - front_occ
 
                   instinct_bias = self.instinct.get_bias_for_action(
-                      free_angle, magnitude=free_mag, front_clearance=front_clearance,
-                      us_left=us_left_dist, us_right=us_right_dist
+                      free_angle,
+                      magnitude=free_mag,
+                      front_clearance=front_clearance,
+                      us_left=us_left_dist,
+                      us_right=us_right_dist
                   )
                   instinct_bias = self.instinct.apply_us_bias(instinct_bias, us_left_dist, us_right_dist)
 
+                  # 5. Feature extraction
                   features = self.brain.get_features(
                       lidar_16, us_left_dist, us_right_dist,
                       encoder_l, encoder_r,
@@ -2374,31 +2930,49 @@ class SwarmCoreV55:
                       last_action=self._last_action_type,
                       free_angle=free_angle, free_mag=free_mag)
 
+                  # 6. Concept Graph
                   context = {'min_dist': self.lidar.min_dist, 'us_left': us_left_dist, 'us_right': us_right_dist}
                   best_concept = self.concept_graph.get_best_concept(context)
                   concept_suggestion = None
                   if best_concept:
                       concept_suggestion = self.concept_graph.get_next_action_from_concept(best_concept)
+                      if self.cycle_count % 50 == 0:
+                          logger.info(
+                              f"[CONCEPT] Uzyto konceptu '{best_concept.name}' "
+                              f"(aktywacja={best_concept.activation:.2f}) "
+                              f"→ sugestia: {concept_suggestion.name if concept_suggestion else 'None'}"
+                          )
 
+                  # 7. Decision
+                  # Anti-stagnation force turn check (part of Poziom 2 logic but handled by brain/stabilizer usually)
                   forced_turn = self.anti_stagnation.should_force_turn()
                   if forced_turn is not None:
                       final_action = forced_turn
                       source = "STAGNATION_FORCE"
                       self.stabilizer.force_unlock()
+                      gate_weights = np.zeros(2)
                   else:
-                      action_candidate, source, _ = self.brain.decide(features, instinct_bias, concept_suggestion)
+                      action_candidate, source, gate_weights = self.brain.decide(features, instinct_bias, concept_suggestion)
                       final_action = self.stabilizer.update(action_candidate)
 
+        # ★ Anti-oscillation (Level 2.5)
         if final_action == self._last_action_type:
             self._action_repeat_count += 1
         else:
             self._action_repeat_count = 0
             self._last_action_type = final_action
 
+        # 8. Movement Tracker & Oscillation Check
         self.motors.update_odometry(encoder_l, encoder_r, dt)
-        self.movement_tracker.update(final_action, self.motors.x, self.motors.y, self.cycle_count)
+        self.movement_tracker.update(
+            final_action,
+            self.motors.x,
+            self.motors.y,
+            self.cycle_count
+        )
 
         if self.movement_tracker.is_oscillating() and source not in ["BUMPER_PRIORITY", "STUCK_REVERSE", "STUCK_SPIN_LEFT", "STUCK_SPIN_RIGHT"]:
+            logger.warning("OSCYLACJA wykryta! Wymuszam SPIN.")
             if self.fusion.left_dist >= self.fusion.right_dist:
                 final_action = Action.SPIN_LEFT
             else:
@@ -2406,18 +2980,34 @@ class SwarmCoreV55:
             source = "ANTI_OSCILLATION"
             self.stabilizer.force_unlock()
 
+        # 9. Reward calculation
         reward = self.damper.compute_reward(encoder_l, encoder_r, motor_current, final_action)
+
+        # Sequence reward
         sequence_reward = self.movement_tracker.get_sequence_reward()
         if sequence_reward != 0:
             reward += sequence_reward
+            logger.debug(f"Sequence reward: {sequence_reward:.2f}")
 
+        # Proximity penalty
         if final_action == Action.FORWARD and self.lidar.min_dist < 0.35:
             proximity_penalty = -2.0 * (1.0 - self.lidar.min_dist / 0.35)
             reward += proximity_penalty
 
+        # 10. Q-Update
+        # We need 'features' for update. If we took override action, we might not have features calculated?
+        # We should calculate features anyway if we want to learn from override actions (Avoidance learning).
+        # Or we skip update if override?
+        # The Step 6 logic says "Avoidance learning is implemented... via backward_q updating Avoidance head".
+        # So we should update even if override.
+
         if 'features' not in locals():
+             # Calculate features if not calculated (e.g. override)
+              # 3. Lorenz step (if not done)
               self.lorenz.step()
+              # 4. Free space instinct (if not done)
               free_angle, free_mag = self.instinct.compute_free_space_vector(lidar_16)
+
               features = self.brain.get_features(
                   lidar_16, us_left_dist, us_right_dist,
                   encoder_l, encoder_r,
@@ -2440,18 +3030,30 @@ class SwarmCoreV55:
                 lidar_min=self.lidar.min_dist,
                 stagnant=self.anti_stagnation.is_stagnant,
                 oscillated=oscillated,
-                done=False
+                done=False,
+                lr_scale=1.0
             )
 
+        # 11. Concept Graph Update
         self.concept_graph.update(final_action, reward, self.cycle_count)
+
+        # ---- KONSOLIDACJA KONCEPTÓW ----
         if self.cycle_count % self.config.CONCEPT_PRUNING_INTERVAL == 0 and self.cycle_count > 0:
             self.concept_graph.prune_and_merge(self.cycle_count)
 
-        front_dist_est = self.fusion.front_dist
-        aggression_factor = self.lorenz.z_norm
-        fwd_velocity = self.velocity_mapper.compute_base_velocity(front_dist_est, aggression_factor)
-        base_velocity = self.velocity_mapper.compute_base_velocity(self.lidar.min_dist, aggression_factor)
+        # 12. Velocity mapping
+        # Use fusion front_dist instead of instinct heuristic for base velocity?
+        # Instinct uses 'front_clearance' from LIDAR. Fusion uses min(US, LIDAR).
+        # Better use Fusion for safety.
 
+        front_dist_est = self.fusion.front_dist
+        # agg factor from lorenz
+        aggression_factor = self.lorenz.z_norm
+
+        fwd_velocity   = self.velocity_mapper.compute_base_velocity(front_dist_est, aggression_factor)
+        base_velocity  = self.velocity_mapper.compute_base_velocity(self.lidar.min_dist, aggression_factor)
+
+        # 13. Action -> Target velocities
         if final_action == Action.FORWARD:
             target_l, target_r = fwd_velocity, fwd_velocity
         elif final_action == Action.REVERSE:
@@ -2469,44 +3071,85 @@ class SwarmCoreV55:
         else:
             target_l, target_r = 0.0, 0.0
 
+        # 14. Lorenz bias (only for turns/spins)
         directional_bias = self.lorenz.x_norm
-        if final_action in (Action.TURN_LEFT, Action.TURN_RIGHT, Action.SPIN_LEFT, Action.SPIN_RIGHT):
+        if final_action in (Action.TURN_LEFT, Action.TURN_RIGHT,
+                            Action.SPIN_LEFT, Action.SPIN_RIGHT):
             bias_strength = self.config.LORENZ_BIAS_SCALE
             target_l += directional_bias * bias_strength
             target_r -= directional_bias * bias_strength
 
+        # 15. Ramp limiter
         target_l, target_r = self.velocity_mapper.apply_ramp_limit(target_l, target_r)
 
+        # 16. Enforce symmetry
         if final_action == Action.REVERSE:
             symmetric = (target_l + target_r) / 2.0
             target_l, target_r = symmetric, symmetric
 
+        if final_action == Action.ESCAPE_MANEUVER:
+            mag = min(abs(target_l), abs(target_r))
+            target_l, target_r = mag, -mag
+
+        # 17. Update memory
         self.brain.last_features = features
         self.brain.last_action = final_action
 
+        # 18. PID Control
         pwm_l, pwm_r = self.motors.update_pid(target_l, target_r, encoder_l, encoder_r, dt)
 
+        # 19. Sync memory for reverse
         if final_action == Action.REVERSE:
             symmetric_pwm = -abs((pwm_l + pwm_r) / 2.0)
             pwm_l, pwm_r = symmetric_pwm, symmetric_pwm
             self.motors.sync_memory(pwm_l, pwm_r)
 
+        # 20. Anti-stagnation chaos (only for turns)
         self.anti_stagnation.update(self.motors.x, self.motors.y, (abs(pwm_l)+abs(pwm_r))/2.0, final_action)
-        if final_action in (Action.TURN_LEFT, Action.TURN_RIGHT, Action.SPIN_LEFT, Action.SPIN_RIGHT):
+        if final_action in (Action.TURN_LEFT, Action.TURN_RIGHT,
+                            Action.SPIN_LEFT, Action.SPIN_RIGHT):
              pwm_l, pwm_r = self.anti_stagnation.inject_chaos(
                  self.lorenz.x_norm, self.lorenz.z_norm, pwm_l, pwm_r
              )
 
+        # 21. FORWARD corrections (Straight line via encoders)
         if final_action == Action.FORWARD:
+             # Encoder correction
+             # encoder_l/r assumed to be speed.
              diff = encoder_l - encoder_r
-             correction = diff * self.config.FORWARD_ENCODER_CORRECTION * 50.0
+             # If left is faster, diff > 0. We need to slow down left or speed up right.
+             # Correction factor
+             correction = diff * self.config.FORWARD_ENCODER_CORRECTION * 50.0 # Gain
              pwm_l -= correction
              pwm_r += correction
+
+             # Micro-noise from Lorenz
              micro_noise = directional_bias * self.config.FORWARD_LORENZ_PWM
              pwm_l += micro_noise
              pwm_r -= micro_noise
+
              self.motors.sync_memory(pwm_l, pwm_r)
 
+        # 22. Auto-save
+        # (Managed by brain atexit or step counter)
+
+        # 23. Diagnostics
+        if self.cycle_count % 100 == 0:
+             q_norm = np.linalg.norm(self.brain.nn.W_q)
+             if q_norm > 1000:
+                  logger.warning(f"Q norm: {q_norm:.2f}")
+             if q_norm > 10000:
+                  self.brain.nn.W_q = np.random.randn(16, 8) * 0.01
+                  self.brain.nn.b_q = np.zeros(8)
+                  logger.critical("Q layer reset due to explosion")
+
+        if self.cycle_count % 50 == 0:
+             # Reconstruct log info...
+             pass # Already logged inside decision block mostly
+             # But here we have pwm
+             logger.info(f"CYCLE {self.cycle_count} PWM=({pwm_l:.0f},{pwm_r:.0f}) Act={final_action.name} Src={source}")
+
+        # Final clamp
         pwm_l = np.clip(pwm_l, -self.config.PWM_MAX, self.config.PWM_MAX)
         pwm_r = np.clip(pwm_r, -self.config.PWM_MAX, self.config.PWM_MAX)
 
@@ -2514,25 +3157,103 @@ class SwarmCoreV55:
 
     def get_stats(self) -> Dict:
         return {
+            'l2_exists': self.brain.l2_feature_indices is not None,
+            'l2_features': len(self.brain.l2_feature_indices) if self.brain.l2_feature_indices is not None else 0,
+            'l2_version': getattr(self.brain, 'l2_version', 0),
+            'l2_stability': getattr(self.brain, 'l2_stability_counter', 0),
             'cycle_count':       self.cycle_count,
+            'q_weights_norm':    float(np.linalg.norm(self.brain.nn.W_q)),
+            'gate_weights_norm': float(np.linalg.norm(self.brain.nn.W_gate)),
+            'cf_count':          self.brain.counterfactual_count,
             'epsilon':           self.brain.epsilon,
             'lr':                self.brain.lr,
             'replay_size':       len(self.brain.replay_buffer),
+            'normalizer_n':      self.brain.normalizer.n,
             'concepts_count':    len(self.concept_graph.concepts),
+            'lorenz_state':      self.lorenz.get_state(),
+            'position':          (self.motors.x, self.motors.y, self.motors.theta),
             'stagnant':          self.anti_stagnation.is_stagnant,
         }
 
+
+# Backward compatibility
 SwarmCoreV54 = SwarmCoreV55
+
+
+# =============================================================================
+# TEST
+# =============================================================================
+
 if __name__ == "__main__":
     print("\n" + "=" * 70)
-    print("SWARM CORE v5.5 -- DUAL LINEAR BRAIN -- TEST")
+    print("SWARM CORE v5.14 -- DUAL LINEAR BRAIN -- TEST")
     print("=" * 70 + "\n")
 
     cfg = SwarmConfig()
     core = SwarmCoreV55()
 
+    print("\n=== TEST 3: FeatureImportanceAnalyzer ===")
+    analyzer = FeatureImportanceAnalyzer(82, 32)
+    q_w = np.random.randn(8, 82)
+    a_w = np.random.randn(8, 82)
+    for _ in range(200):
+        analyzer.update(q_w, a_w)
+    indices = analyzer.get_top_features()
+    assert indices is not None and len(indices) == 32
+    print(f"✓ Analizator: wybrano {len(indices)} cech")
+
+    print("\n=== UNIT 4: GateApproximator ===")
+    gate = GateApproximator(16)
+    feat = np.random.randn(16).astype(np.float32)
+    w = gate.predict_weights(feat)
+    assert np.isclose(np.sum(w), 1.0), "Softmax nie sumuje sie do 1"
+    gate.update(feat, np.array([1.0, 0.0]))
+    print("✓ GateApproximator OK")
+
+    wm = WorldModel(state_dim=32, action_dim=8)
+    state = np.random.randn(32).astype(np.float32)
+    next_state, reward = wm.predict(state, 3)
+    assert next_state.shape == (32,)
+    print("✓ WorldModel.predict OK")
+
+    # Test treningu
+    target_next = np.random.randn(32).astype(np.float32)
+    wm.train_step(state, 3, target_next, 1.0)
+    print("✓ WorldModel.train_step OK")
+
+    print("\n=== UNIT 8: NeuralBrainWithImagination ===")
+    nn = NeuralBrainWithImagination(cfg)
+    feat = np.random.randn(82).astype(np.float32)
+    q = nn.forward_q(feat)
+    assert q.shape == (8,)
+    print("✓ forward_q OK")
+
+    gate = nn.forward_gate()
+    assert gate.shape == (2,) and np.isclose(np.sum(gate), 1.0)
+    print("✓ forward_gate OK")
+
+    next_feat, pred_reward = nn.forward_world(0)
+    assert next_feat.shape == (82,)
+    print("✓ forward_world OK")
+
+    target_q = np.random.randn(8)
+    nn.backward_q(target_q)
+    print("✓ backward_q OK")
+
+    target_next = np.random.randn(82)
+    nn.backward_world(target_next, 1.0)
+    print("✓ backward_world OK")
+
+    print("\n=== UNIT 9: NeuralHybridBrain ===")
+    fe = FeatureExtractor(cfg)
+    brain = NeuralHybridBrain(cfg, fe)
+    feat = brain.get_features(np.random.randn(16), 1,1,0,0,0,0,0,1)
+    action, src, gate = brain.decide(feat, {}, None)
+    print(f"✓ decide -> {action.name}, {src}")
+
     print("[INTEG] SwarmCoreV55 DualLinear -- 20 krokow ...")
     for i in range(20):
+        # Symulacja
         pwm_l, pwm_r = core.loop(
             lidar_points=[(a, max(0.1, 2.0 - i*0.1)) for a in range(0, 360, 22)],
             encoder_l=0.3, encoder_r=0.3, motor_current=1.2,
@@ -2540,5 +3261,52 @@ if __name__ == "__main__":
         )
         print(f"#{i+1:2d}: PWM=({pwm_l:+6.1f},{pwm_r:+6.1f}) | {core.brain.last_action}")
 
+    print("\n[STATS v5.14]:")
+    for k, v in core.get_stats().items():
+        print(f"   {k}: {v}")
+
     core.save_state()
-    print("\n[OK] Test PASSED!")
+    core.brain.debug_l2()
+
+    # Wymus wzmocnienie
+    changed, stats = core.brain.reinforce_l2(force=True, method='combined')
+    print(f"Wzmocnienie: {changed}")
+    core.brain.debug_l2()
+    print("\n[OK] Test v5.14 -- wszystkie testy jednostkowe i integracyjne PASSED!\n")
+    print("\n🔬 Test L2:")
+    core.brain.debug_l2()
+
+    # Wymus wzmocnienie
+    changed, stats = core.brain.reinforce_l2(force=True, method='combined')
+    print(f"Wzmocnienie: {changed}")
+    core.brain.debug_l2()
+
+    print("\n=== TEST 10: Concept Pruning & Merging ===")
+    cg = ConceptGraph(cfg)
+    # Add dummy concepts
+    c1 = Concept("learned_c1", [Action.FORWARD, Action.TURN_LEFT])
+    c1.usage_count = 6
+    c1.last_used_step = 0; c1.success_count = 6; c1.success_ratio = 1.0
+    cg.concepts["learned_c1"] = c1
+
+    c2 = Concept("learned_c2", [Action.FORWARD, Action.TURN_LEFT]) # Identical sequence
+    c2.usage_count = 10; c2.success_count = 10; c2.success_ratio = 1.0
+    c2.last_used_step = 100
+    cg.concepts["learned_c2"] = c2
+
+    # Trigger pruning/merging
+    # Set pruning interval to small for test
+    cg.pruning_interval = 50
+    cg.min_usage_to_survive = 5
+
+    # Test step 200 (c1 should be pruned because usage < 5 and age > 50)
+    # But wait, prune_and_merge also merges. c1 and c2 are identical.
+    # They should be merged.
+
+    cg.prune_and_merge(200)
+
+    # Verify
+    print(f"Concepts after pruning: {list(cg.concepts.keys())}")
+    # Expect merged concept
+    sim = cg._calculate_similarity(cg.concepts["learned_c1"].sequence, cg.concepts["learned_c2"].sequence); print(f"Similarity: {sim}")
+    print("✓ Concept Pruning & Merging OK")

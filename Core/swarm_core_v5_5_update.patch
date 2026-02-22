@@ -1,0 +1,266 @@
+--- Core/swarm_core_v5_5.py
++++ Core/swarm_core_v5_5.py
+@@ -1134,7 +1134,8 @@
+         self.actions_list = list(Action)
+         self.n_actions = len(self.actions_list)
+
+-        # Inicjalizacja feature extractor z dummy data zeby poznac n_features
++        # Inicjalizacja feature extractor z dummy data zeby poznac n_features
++        # Wymagane dla DualLinearApproximator
+         dummy = self.feature_extractor.extract(
+             np.zeros(16), 3.0, 3.0, 0.0, 0.0, 0.0, 0.0, 0, 3.0, None, 0.0, 0.0
+         )
+@@ -1142,38 +1143,21 @@
+
+-        # Zaladuj wagi z pliku (jesli istnieja)
+-        self.nn = NeuralBrainWithImagination(
+-            config, self.n_features, self.n_actions,
+-            l1_weights=None, l2_weights=None, a_weights=None, gate_weights=None
++        # Krok 2: Używamy DualLinearApproximator zamiast NeuralBrain
++        self.q_approx = DualLinearApproximator(
++            n_features=self.n_features,
++            n_actions=self.n_actions,
++            learning_rate=config.LEARNING_RATE,
++            avoidance_penalty=config.AVOIDANCE_PENALTY,
++            weight_clip=10.0
+         )
+
+-        # Metadata
+-        self.top32_indices = None
+-        self.step_counter = 0
+-        self.counterfactual_count = 0
+         self.lr = config.NN_LEARNING_RATE
+-        # L2 Metadata
+-        self.l2_feature_indices = None
+-        self.l2_importance_history = []
+-        self.l2_stability_counter = 0
+-        self.l2_last_reinforce = 0
+-        self.l2_version = 0
+-        self.l2_last_importance = None
+-
+-        self.load_or_create()   # patrz sekcja 5
+
+         # Standardowe komponenty
+         self.normalizer = RunningNormalizer(self.n_features)
+         self.replay_buffer = ReplayBuffer(capacity=config.REPLAY_BUFFER_CAPACITY)
+-        self.batch_size = config.REPLAY_BATCH_SIZE
+-        self.train_freq = config.REPLAY_TRAIN_FREQ
+-        self.steps_since_train = 0
+         self.epsilon = config.EPSILON
+
+         self.last_features = None
+         self.last_action = None
+-
+-        # Rejestracja auto-zapisu
+-        import atexit
+-        atexit.register(self.save)
+-
+-        logger.info(f"NeuralHybridBrain: MLP {self.n_features}->{config.NN_HIDDEN_1}->{config.NN_HIDDEN_2}->Output initialized")
++
++        logger.info(f"NeuralHybridBrain: DualLinearApproximator initialized")
+
+     def get_features(self, lidar_16, us_left, us_right, encoder_l, encoder_r,
+                      lorenz_x, lorenz_z, rear_bumper, min_dist, last_action=None,
+@@ -1187,14 +1171,8 @@
+         if random.random() < self.epsilon:
+             return random.choice(self.actions_list), "EXPLORE", np.zeros(2)
+
+-        q = self.nn.forward_q(features)
+-        # opcjonalnie: odejmij kare avoidance
+-        if self.nn.W_a is not None:
+-            a_out = self.nn.forward_a()
+-            q = q - self.config.AVOIDANCE_PENALTY * a_out
+-
+-        scores = q.copy()
++        combined_q = self.q_approx.predict(features)   # już z uwzględnieniem A
++        scores = combined_q.copy()
++
+         for i, action in enumerate(self.actions_list):
+             scores[i] += instinct_bias.get(action, 0.0) * 4.0
+             if action == concept_suggestion:
+@@ -1202,11 +1180,7 @@
+
+         best_idx = int(np.argmax(scores))
+-
+-        # Gate weights for diagnostics (if gate exists)
+-        gate_weights = np.zeros(2)
+-        if hasattr(self.nn, 'W_gate'):
+-             gate_weights = self.nn.forward_gate()
+-
+-        return self.actions_list[best_idx], "NEURAL", gate_weights
++        return self.actions_list[best_idx], "Q_APPROX+INST+CONCEPT", np.zeros(2)
+
+     def is_bad_state(self, reward: float, source: str, action: Action,
+                      lidar_min: float, stagnant: bool, oscillated: bool) -> Tuple[bool, float]:
+         # Kolizja / twardy odruch
+-        if source in ("LIDAR_HARD_SAFETY", "HARD_REFLEX") and action != Action.REVERSE:
+-            return True, 1.0   # chcemy, aby A dazylo do 1.0 (unikaj)
++        if source in ("LIDAR_HARD_SAFETY", "HARD_REFLEX") and action != Action.REVERSE:
++            return True, 2.0   # bardzo źle
+         # Stagnacja (ale nie podczas skretu)
+-        if stagnant and action in (Action.FORWARD, Action.REVERSE):
+-            return True, 0.8
++        if stagnant and action in (Action.FORWARD, Action.REVERSE):
++            return True, 1.5
+         # Oscylacja
+-        if oscillated:
+-            return True, 0.6
++        if oscillated:
++            return True, 1.2
+         # Niska nagroda
+-        if reward < -1.0:
+-            return True, 0.5
++        if reward < -1.5:
++            return True, 1.0
++        # Jazda do przodu zbyt blisko ściany (ale jeszcze nie kolizja)
++        if action == Action.FORWARD and lidar_min < 0.2:
++            return True, 0.8
++
+         # Domyslnie – dobre doswiadczenie
+         return False, 0.0
+
+     def update_q(self, old_features: np.ndarray, action: Action,
+                  reward: float, new_features: np.ndarray,
+                  source: str, lidar_min: float,
+                  stagnant: bool, oscillated: bool,
+                  done: bool = False, lr_scale=1.0):
+
+         action_idx = self.actions_list.index(action)
+-
+-        # Dodaj do replay buffera
+-        self.replay_buffer.push(old_features, action_idx, reward, new_features, done)
+-
+-        # Uczenie modelu swiata na biezacym doswiadczeniu
+-        self.nn.forward_q(old_features)          # wypelnia cache
+-        self.nn.forward_world(action_idx)        # forward swiata
+-        self.nn.backward_world(new_features, reward)
+-
+-        # Uczenie Avoidance (natychmiastowe)
+-        is_bad, target_a_val = self.is_bad_state(reward, source, action,
++
++        # Czy to złe doświadczenie?
++        is_bad, bad_target = self.is_bad_state(reward, source, action,
+                                                 lidar_min, stagnant, oscillated)
++
+         if is_bad:
+-            target_a = np.zeros(self.n_actions)
+-            target_a[action_idx] = target_a_val
+-            # Wymus forward A zeby miec cache
+-            self.nn.forward_a()
+-            # Uzyj backward_q tylko do aktualizacji A (przekazujac target_q jako obecne q zeby gradient d_q byl 0?)
+-            # Nie, backward_q oblicza d_q = q - target_q.
+-            # Jesli chcemy uczyc TYLKO A, to d_q powinno byc 0.
+-            # Wiec target_q = q.
+-            current_q = self.nn.cache['q']
+-            self.nn.backward_q(current_q, target_a)
+-
+-        # Generuj kontrfaktyke
+-        cf = self.nn.generate_counterfactual(old_features, action_idx, reward)
+-        if cf[0] is not None:
+-            cf_action, cf_val, cf_next = cf
+-            self.replay_buffer.push(old_features, cf_action, cf_val, cf_next, done)
+-            self.counterfactual_count += 1
++            # Aktualizuj macierz unikania
++            self.q_approx.update_a(old_features, action_idx, bad_target)
++        else:
++            # Normalna aktualizacja Q (TD)
++            if done:
++                target_q = reward
++            else:
++                next_q = self.q_approx.predict_q(new_features)
++                max_next_q = float(np.max(next_q))
++                target_q = reward + self.config.DISCOUNT_FACTOR * max_next_q
++            self.q_approx.update_q(old_features, action_idx, target_q)
+
+         # Decay epsilon i LR
+         self.epsilon = max(self.config.EPSILON_MIN,
+                            self.epsilon * self.config.EPSILON_DECAY)
+         self.lr = max(self.config.LR_MIN,
+                       self.lr * self.config.LR_DECAY)
+-        self.nn.lr = self.lr
+-
+-        self.steps_since_train += 1
+-        if self.steps_since_train >= self.train_freq and len(self.replay_buffer) >= self.batch_size:
+-            self._train_on_batch()
+-            self.steps_since_train = 0
+-
+-        self.step_counter += 1
+-        # Zaawansowane wzmacnianie L2 co 1000 krokow z roznymi metodami
+-        if self.step_counter % 1000 == 0 and self.step_counter > 0:
+-            # Rotacja metod co 5000 krokow
+-            method_cycle = (self.step_counter // 1000) % 5
+-            if method_cycle == 0:
+-                method = 'simple'
+-            elif method_cycle == 1:
+-                method = 'combined'
+-            elif method_cycle == 2:
+-                method = 'stability'
+-            else:
+-                method = 'combined'  # domyslnie combined
+-
+-            changed, stats = self.reinforce_l2(method=method)
+-
+-            # Jesli zmiana byla duza (>20%), zapisz stan natychmiast
+-            if changed and stats.get('changes', 0) > 6:
+-                logger.info("ðŸ“¥ Duza zmiana L2 â€“ wymuszam zapis stanu")
+-                self.save()
+-
+-        if self.step_counter % 5000 == 0 and self.step_counter > 0:
+-            results = {}
+-            for method in ['simple', 'combined', 'stability']:
+-                imp, conf = self.analyze_feature_importance(method)
+-                if imp is not None:
+-                    top5 = np.argsort(imp)[-5:]
+-                    results[method] = {
+-                        'top5': top5,
+-                        'confidence': conf
+-                    }
+-
+-            # Znajdz zgodnosc miedzy metodami (ile cech wspolnych w top20)
+-            if len(results) >= 2:
+-                sets = [set(np.argsort(results[m]['top5'])[-20:]) for m in results]
+-                agreement = len(sets[0].intersection(*sets[1:])) / 20.0
+-                logger.info(f"ðŸ“Š Zgodnosc metod L2: {agreement:.2f}")
+-        if self.step_counter % 400 == 0:
+-            self.save()
++        self.q_approx.set_learning_rate(self.lr)
+
+     def _train_on_batch(self):
+         batch = self.replay_buffer.sample(self.batch_size)
+@@ -1711,9 +1666,8 @@
+     def save_state(self):
+-        # 1. Zapisz wagi sieci (brain.save() juz to robi)
+-        if hasattr(self.brain, 'save'):
+-            self.brain.save()
+-        else:
+-            logger.warning("Brain does not have save method")
+-
+         # 2. Przygotuj dane do pickle (koncepty, normalizer, Lorenz, epsilon, lr)
+         concepts_data = {}
+         for name, c in self.concept_graph.concepts.items():
+@@ -1728,6 +1682,8 @@
+         }
+
+         data = {
++            'q_weights': self.brain.q_approx.q_weights.tolist(),
++            'a_weights': self.brain.q_approx.a_weights.tolist(),
+             'normalizer_state': self.brain.normalizer.get_state(),
+             'epsilon': self.brain.epsilon,
+             'lr': self.brain.lr,
+@@ -1744,6 +1700,10 @@
+             if norm_state and norm_state.get('n', 0) > 0:
+                 self.brain.normalizer.set_state(norm_state)
+                 logger.info(f"Loaded normalizer: n={norm_state['n']} samples")
++
++            if 'q_weights' in saved: self.brain.q_approx.q_weights = np.array(saved['q_weights'])
++            if 'a_weights' in saved: self.brain.q_approx.a_weights = np.array(saved['a_weights'])
+
+             # Wczytaj epsilon i lr
+             self.brain.epsilon = saved.get('epsilon', self.config.EPSILON)
+-            self.brain.lr = saved.get('lr', self.config.LEARNING_RATE)
+-            self.brain.nn.lr = self.brain.lr
++            self.brain.lr = saved.get('lr', self.config.LEARNING_RATE)
++            self.brain.q_approx.set_learning_rate(self.brain.lr)
+
+             # Wczytaj koncepty
+             saved_concepts = saved.get('concepts', {})
