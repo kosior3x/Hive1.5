@@ -4,6 +4,7 @@ import os
 import time
 import json
 import numpy as np
+import argparse
 
 # Add src to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -14,9 +15,37 @@ from semantic_mock import SemanticEngineMock
 
 # Redirect print to null during tests to keep console clean, or keep for debugging?
 # We'll keep prints but format them nicely.
+# Resolution: Added --silent flag and OutputSuppressor to toggle between modes.
+
+class OutputSuppressor:
+    """Context manager to suppress stdout and stderr."""
+    def __init__(self, active=True):
+        self.active = active
+        self._stdout = sys.stdout
+        self._stderr = sys.stderr
+        self._devnull = None
+
+    def __enter__(self):
+        if self.active:
+            sys.stdout.flush()
+            sys.stderr.flush()
+            self._devnull = open(os.devnull, 'w')
+            sys.stdout = self._devnull
+            sys.stderr = self._devnull
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.active:
+            sys.stdout.flush()
+            sys.stderr.flush()
+            sys.stdout = self._stdout
+            sys.stderr = self._stderr
+            if self._devnull:
+                self._devnull.close()
 
 class HybridTestSuite:
-    def __init__(self):
+    def __init__(self, verbose=True):
+        self.verbose = verbose
         self.results = {
             "test_suite": "Bio-Swarm + CSA Hybrid",
             "timestamp": time.ctime(),
@@ -25,12 +54,26 @@ class HybridTestSuite:
         self.sem_engine = SemanticEngineMock(dim=16)
 
     def run_all(self):
-        print("🚀 STARTING HYBRID TEST SUITE...")
-        self.test_semantic_preservation()
-        self.test_performance_scalability()
-        self.test_chaos_dynamics()
-        self.test_comparative()
-        self.save_report()
+        header = "🚀 STARTING HYBRID TEST SUITE"
+        if not self.verbose:
+            header += " (SILENT MODE)"
+        print(f"{header}...")
+
+        start_time = time.perf_counter()
+
+        with OutputSuppressor(active=not self.verbose):
+            self.test_semantic_preservation()
+            self.test_performance_scalability()
+            self.test_chaos_dynamics()
+            self.test_comparative()
+            report_path = self.save_report()
+
+        elapsed = time.perf_counter() - start_time
+
+        if not self.verbose:
+            print(f"✅ Tests complete in {elapsed:.2f}s. Report saved to: {report_path}")
+        else:
+            print(f"\n✨ All tests finished in {elapsed:.2f}s.")
 
     # ==========================================
     # 1. SEMANTIC PRESERVATION
@@ -159,7 +202,12 @@ class HybridTestSuite:
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(self.results, f, indent=2)
         print(f"\n📄 Report saved to {path}")
+        return path
 
 if __name__ == "__main__":
-    suite = HybridTestSuite()
+    parser = argparse.ArgumentParser(description="Hybrid Swarm Test Suite")
+    parser.add_argument("--silent", action="store_true", help="Suppress detailed output")
+    args = parser.parse_args()
+
+    suite = HybridTestSuite(verbose=not args.silent)
     suite.run_all()
