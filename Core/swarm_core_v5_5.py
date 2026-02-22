@@ -802,13 +802,14 @@ class LidarEngine:
         for angle, dist in lidar_points:
             if dist <= 0 or dist > self.config.LIDAR_MAX_RANGE:
                 continue
+            # Handle variable angle input (real hardware)
             sector = int((angle % 360) / 22.5) % 16
             sector_dists[sector].append(dist)
 
         self.min_dist = self.config.LIDAR_MAX_RANGE
         for i, dists in enumerate(sector_dists):
             if dists:
-                min_d = min(dists)
+                min_d = min(dists) # Safety: closest object
                 self.min_dist = min(self.min_dist, min_d)
                 self.sectors_16[i] = 1.0 - min(min_d / self.config.LIDAR_MAX_RANGE, 1.0)
             else:
@@ -816,21 +817,6 @@ class LidarEngine:
 
         return self.sectors_16
 
-    def check_front_sectors_blocked(self, threshold: float, num_sectors: int = 4) -> bool:
-        """Sprawdź czy przód jest zablokowany (połowa wiązki)"""
-        front_sectors = self.sectors_16[:num_sectors]
-        blocked_count = np.sum(front_sectors > threshold)
-        return blocked_count >= (num_sectors // 2)
-
-
-# =============================================================================
-# FEATURE EXTRACTOR (v5.9 — wektor cech z WSZYSTKICH czujników)
-# =============================================================================
-
-
-# =============================================================================
-# RUNNING NORMALIZER (Welford online — stabilizuje cechy dla Q-aproksymatora)
-# =============================================================================
 
 class RunningNormalizer:
     """
@@ -1709,25 +1695,6 @@ class NeuralHybridBrain:
                       self.lr * self.config.LR_DECAY)
         self.q_approx.set_learning_rate(self.lr)
 
-class StuckDetector:
-    """
-    Wykrywa czy robot jest zablokowany.
-    Koła się kręcą (enkodery > 0), ale odległość z przodu nie maleje.
-    """
-    def __init__(self, config: SwarmConfig):
-        self.config = config
-        self.front_dist_history = deque(maxlen=10)
-        self.stuck_count = 0
-
-    def update(self, front_dist: float, enc_l: float, enc_r: float) -> bool:
-        self.front_dist_history.append(front_dist)
-
-        # Czy koła się kręcą?
-        wheels_moving = abs(enc_l) > 0.01 or abs(enc_r) > 0.01
-
-        if not wheels_moving:
-            self.stuck_count = 0
-            return False
 
         # Czy odległość z przodu się zmienia?
         if len(self.front_dist_history) == 10:
@@ -1920,20 +1887,16 @@ class SensorFusion:
         self.right_dist = 0.0
 
     def update(self, us_left: float, us_right: float, lidar_16: np.ndarray):
-        # US: 15 stopni od osi pojazdu
-        # LIDAR: sektory 14,15 (lewy przód), 0,1 (prawy przód)
-
-        # Front dist = min(US, LIDAR_front)
+        # US dają odległość na wprost z offsetem kątowym
         us_min = min(us_left, us_right)
 
-        # LIDAR front (sektory 15, 0) - najbardziej centralne
+        # LIDAR daje dokładny pomiar na wprost (sektory 15 i 0)
         lidar_front_central = min(lidar_16[15], lidar_16[0])
-        # Skalowanie lidar_16 (jest 1-dist/max) na metry
-        # 1.0 = 0m, 0.0 = max_range
-        # dist = (1.0 - val) * max_range
-        lidar_dist_m = (1.0 - lidar_front_central) * self.config.LIDAR_MAX_RANGE
+        # Convert from normalized to meters: 1.0 -> 0m, 0.0 -> max_range
+        lidar_front_dist = (1.0 - lidar_front_central) * self.config.LIDAR_MAX_RANGE
 
-        self.front_dist = min(us_min, lidar_dist_m)
+        # Fuzja: bierzemy MNIEJSZĄ wartość (bezpieczeństwo!)
+        self.front_dist = min(us_min, lidar_front_dist)
 
         # Rear (sektory 7, 8)
         lidar_rear = min(lidar_16[7], lidar_16[8])
@@ -1946,6 +1909,7 @@ class SensorFusion:
         # Right (sektory 3, 4)
         lidar_right = min(lidar_16[3], lidar_16[4])
         self.right_dist = (1.0 - lidar_right) * self.config.LIDAR_MAX_RANGE
+
 
 class BumperSystem:
     """
@@ -1973,6 +1937,7 @@ class BumperSystem:
 
         # (Tu można dodać obsługę przednich/bocznych bumperów jeśli są w inputach)
         return None
+
 
 
 class EncoderMonitor:
@@ -2280,6 +2245,42 @@ class StateManager:
 # SWARM CORE v5.5 FINAL
 # =============================================================================
 
+class StuckDetector:
+    """
+    Wykrywa czy robot jest zablokowany.
+    Koła się kręcą (enkodery > 0), ale odległość z przodu nie maleje.
+    """
+    def __init__(self, config: SwarmConfig):
+        self.config = config
+        self.front_dist_history = deque(maxlen=10)
+        self.stuck_count = 0
+        self.last_stuck_cycle = 0
+        self.stuck_cooldown = 50
+
+    def update(self, front_dist: float, enc_l: float, enc_r: float, current_cycle: int = 0) -> bool:
+        if current_cycle - self.last_stuck_cycle < self.stuck_cooldown:
+            return False
+
+        self.front_dist_history.append(front_dist)
+
+        wheels_moving = abs(enc_l) > 0.02 or abs(enc_r) > 0.02
+
+        if not wheels_moving:
+            self.stuck_count = 0
+            return False
+
+        if len(self.front_dist_history) == 10:
+            dist_std = np.std(self.front_dist_history)
+            if dist_std < 0.01:
+                self.stuck_count += 1
+                if self.stuck_count > 8:
+                    self.last_stuck_cycle = current_cycle
+                    return True
+            else:
+                self.stuck_count = max(0, self.stuck_count - 1)
+
+        return False
+
 class SwarmCoreV55:
     """
     SWARM v5.5 - Production Final
@@ -2517,6 +2518,8 @@ class SwarmCoreV55:
         self.cycle_count += 1
 
         # === INICJALIZACJA ZMIENNYCH (ZAPOBIEGA BŁĘDOM) ===
+        final_action = None
+        source = "UNKNOWN"
         front_clearance = 1.0
         free_angle = 0.0
         free_mag = 0.0
@@ -2584,22 +2587,6 @@ class SwarmCoreV55:
                               f"(aktywacja={best_concept.activation:.2f}) "
                               f"-> sugestia: {concept_suggestion.name if concept_suggestion else 'None'}"
                           )
-                          self._last_concept = best_concept.name
-                          logger.info(
-                              f"[CONCEPT] Uzyto konceptu '{best_concept.name}' "
-                              f"(aktywacja={best_concept.activation:.2f}) "
-                              f"-> sugestia: {concept_suggestion.name if concept_suggestion else 'None'}"
-                          )
-
-                  forced_turn = self.anti_stagnation.should_force_turn()
-                  if forced_turn is not None:
-                      final_action = forced_turn
-                      source = "STAGNATION_FORCE"
-                      self.stabilizer.force_unlock()
-                  else:
-                      action_candidate, source, _ = self.brain.decide(features, instinct_bias, concept_suggestion)
-                      final_action = self.stabilizer.update(action_candidate)
-
         if final_action == self._last_action_type:
             self._action_repeat_count += 1
         else:
@@ -2792,28 +2779,6 @@ class SwarmCoreV55:
             )
 
         return pwm_l, pwm_r
-        # POZIOM 1: Damper handled in loop
-        # POZIOM 2: Blokada
-        if self.stuck_detector.update(self.fusion.front_dist, enc_l, enc_r):
-            logger.warning("STUCK DETECTED! Uwalniam robota...")
-            if self.fusion.rear_dist > 0.3:
-                return Action.REVERSE, "STUCK_REVERSE"
-            else:
-                if self.fusion.left_dist >= self.fusion.right_dist:
-                    return Action.SPIN_LEFT, "STUCK_SPIN_LEFT"
-                else:
-                    return Action.SPIN_RIGHT, "STUCK_SPIN_RIGHT"
-
-        # POZIOM 3: Bezpieczenstwo
-        if self.fusion.front_dist < self.config.LIDAR_HARD_SAFETY_MIN:
-             if self.fusion.rear_dist > 0.3:
-                  return Action.REVERSE, "SAFETY_REVERSE"
-             else:
-                  if self.fusion.left_dist >= self.fusion.right_dist:
-                       return Action.SPIN_LEFT, "SAFETY_SPIN"
-                  else:
-                       return Action.SPIN_RIGHT, "SAFETY_SPIN"
-        return None, "NORMAL"
 
 
     def get_stats(self) -> Dict:
