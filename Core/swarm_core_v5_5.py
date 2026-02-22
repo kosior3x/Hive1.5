@@ -62,19 +62,23 @@ class SwarmConfig:
     MAX_SPEED_MPS: float = 0.5
 
     # Dystanse (NAPRAWIONE - 10cm target)
-    US_SAFETY_DIST: float = 0.12
-    US_TARGET_DIST: float = 0.10
-    LIDAR_SAFETY_RADIUS: float = 0.18
+    # SAFETY - minimalne progi (naprawdę blisko!)
+    US_SAFETY_DIST: float = 0.10        # 10 cm - dopiero tutaj reaguj!
+    US_TARGET_DIST: float = 0.10        # 10 cm - cel jazdy
+
+    LIDAR_SAFETY_RADIUS: float = 0.10   # 10 cm - dopiero tutaj reaguj!
     LIDAR_MAX_RANGE: float = 3.0
 
-    SAFETY_DIST_SPEED_SCALE: float = 0.25
-    SAFETY_US_MIN: float = 0.08
-    SAFETY_US_MAX: float = 0.25
-    SAFETY_LIDAR_MIN: float = 0.12
-    SAFETY_LIDAR_MAX: float = 0.35
-    # LIDAR hard safety — wymuszony REVERSE/TURN gdy za blisko ściany
-    LIDAR_HARD_SAFETY_MIN: float = 0.25  # Lmin poniżej tej wartości = natychmiastowa reakcja
-    HARD_REFLEX_HOLD_CYCLES: int = 3      # Krócej trzymaj akcję awaryjną
+    # Dynamiczne safety (zależne od prędkości)
+    SAFETY_DIST_SPEED_SCALE: float = 0.1   # Mniejsze skalowanie
+    SAFETY_US_MIN: float = 0.08            # 8 cm - absolutne minimum
+    SAFETY_US_MAX: float = 0.15            # 15 cm - maximum przy dużej prędkości
+    SAFETY_LIDAR_MIN: float = 0.08         # 8 cm
+    SAFETY_LIDAR_MAX: float = 0.15         # 15 cm
+
+    # HARD SAFETY - dopiero przy 10 cm!
+    LIDAR_HARD_SAFETY_MIN: float = 0.10    # 10 cm - dopiero tutaj panika!
+    HARD_REFLEX_HOLD_CYCLES: int = 2       # Krótko trzymaj akcję awaryjną
 
     # Rear bumper
     REAR_BUMPER_FORWARD_CYCLES: int = 3  # Ile cykli FORWARD po kolizji tylnej
@@ -87,7 +91,7 @@ class SwarmConfig:
     # Cofanie z LIDAR (NAPRAWIONE)
     REVERSE_LIDAR_CHECK: bool = True
     REVERSE_LIDAR_SECTORS: int = 4
-    REVERSE_LIDAR_THRESHOLD: float = 0.15
+    REVERSE_LIDAR_THRESHOLD: float = 0.10  # 10 cm - sprawdzaj LIDAR
 
     # Q-Learning (v5.9)
     LEARNING_RATE: float = 0.001     # zmniejszone dla stabilności aproksymatora
@@ -2402,32 +2406,648 @@ class SwarmCoreV55:
             if lorenz_state:
                 self.lorenz.x, self.lorenz.y, self.lorenz.z = lorenz_state
     def _compute_dynamic_safety(self, avg_speed: float) -> Tuple[float, float]:
+        """
+    def validate_safety_constraints(self, us_left_dist: float, us_right_dist: float,
+                                   encoder_l: float, encoder_r: float,
+                                   rear_bumper: int = 0) -> Optional[Tuple[Action, str]]:
+        avg_speed = (encoder_l + encoder_r) / 2.0
+        dyn_us, _dyn_lidar = self._compute_dynamic_safety(avg_speed)
+
+        # --------------------------------------------------------------
+        # LIDAR HARD SAFETY - TYLKO PONIŻEJ 10 cm!
+        # --------------------------------------------------------------
+        if self.lidar.min_dist < self.config.LIDAR_HARD_SAFETY_MIN:  # 10 cm
+            # Anuluj wszystkie inne akcje
+            self.rear_bumper_forward_remaining = 0
+            self.stabilizer.force_unlock()
+
+            # Wybierz kierunek ucieczki
+            if us_left_dist > us_right_dist + 0.1:
+                self.hard_reflex_action = Action.TURN_LEFT
+            elif us_right_dist > us_left_dist + 0.1:
+                self.hard_reflex_action = Action.TURN_RIGHT
+            else:
+                # Oba boki podobne - sprawdź tył
+                rear_sectors = self.lidar.sectors_16[6:10]
+                rear_blocked = float(np.mean(rear_sectors)) > 0.6
+                if rear_blocked:
+                    # Wszędzie źle - spin
+                    self.hard_reflex_action = (Action.SPIN_LEFT if us_left_dist >= us_right_dist
+                                              else Action.SPIN_RIGHT)
+                else:
+                    self.hard_reflex_action = Action.REVERSE
+
+            self.hard_reflex_hold_remaining = self.config.HARD_REFLEX_HOLD_CYCLES
+            return self.hard_reflex_action, "LIDAR_HARD_SAFETY"
+
+        # --------------------------------------------------------------
+        # US CHECK - TYLKO PONIŻEJ 10-15 cm (dynamiczne)
+        # --------------------------------------------------------------
+        us_front_min = min(us_left_dist, us_right_dist)
+
+        # TYLKO gdy naprawdę blisko!
+        if 0.01 < us_front_min < dyn_us:  # dyn_us to 8-15 cm
+            # Sprawdź LIDAR czy potwierdza
+            if self.config.REVERSE_LIDAR_CHECK:
+                front_blocked = self.lidar.check_front_sectors_blocked(
+                    threshold=0.3,  # Wyższy próg - musi być naprawdę blisko
+                    num_sectors=self.config.REVERSE_LIDAR_SECTORS
+                )
+                if not front_blocked:
+                    # LIDAR mówi że jest miejsce - NIE COFAJ!
+                    return None, "US_WARNING_ONLY"
+
+            # Faktycznie jest blisko - delikatnie cofnij
+            self.stabilizer.force_unlock()
+            self.hard_reflex_action = Action.REVERSE
+            self.hard_reflex_hold_remaining = 1  # Tylko 1 cykl!
+            return Action.REVERSE, "CLOSE_CALL"
+
+        return None
+        Oblicza dynamiczne progi bezpieczeństwa.
+        Teraz znacznie odważniejsze - reaguje tylko naprawdę blisko!
+    def validate_safety_constraints(self, us_left_dist: float, us_right_dist: float,
+                                   encoder_l: float, encoder_r: float,
+                                   rear_bumper: int = 0) -> Optional[Tuple[Action, str]]:
+        avg_speed = (encoder_l + encoder_r) / 2.0
+        dyn_us, _dyn_lidar = self._compute_dynamic_safety(avg_speed)
+
+        # --------------------------------------------------------------
+        # LIDAR HARD SAFETY - TYLKO PONIŻEJ 10 cm!
+        # --------------------------------------------------------------
+        if self.lidar.min_dist < self.config.LIDAR_HARD_SAFETY_MIN:  # 10 cm
+            # Anuluj wszystkie inne akcje
+            self.rear_bumper_forward_remaining = 0
+            self.stabilizer.force_unlock()
+
+            # Wybierz kierunek ucieczki
+            if us_left_dist > us_right_dist + 0.1:
+                self.hard_reflex_action = Action.TURN_LEFT
+            elif us_right_dist > us_left_dist + 0.1:
+                self.hard_reflex_action = Action.TURN_RIGHT
+            else:
+                # Oba boki podobne - sprawdź tył
+                rear_sectors = self.lidar.sectors_16[6:10]
+                rear_blocked = float(np.mean(rear_sectors)) > 0.6
+                if rear_blocked:
+                    # Wszędzie źle - spin
+                    self.hard_reflex_action = (Action.SPIN_LEFT if us_left_dist >= us_right_dist
+                                              else Action.SPIN_RIGHT)
+                else:
+                    self.hard_reflex_action = Action.REVERSE
+
+            self.hard_reflex_hold_remaining = self.config.HARD_REFLEX_HOLD_CYCLES
+            return self.hard_reflex_action, "LIDAR_HARD_SAFETY"
+
+        # --------------------------------------------------------------
+        # US CHECK - TYLKO PONIŻEJ 10-15 cm (dynamiczne)
+        # --------------------------------------------------------------
+        us_front_min = min(us_left_dist, us_right_dist)
+
+        # TYLKO gdy naprawdę blisko!
+        if 0.01 < us_front_min < dyn_us:  # dyn_us to 8-15 cm
+            # Sprawdź LIDAR czy potwierdza
+            if self.config.REVERSE_LIDAR_CHECK:
+                front_blocked = self.lidar.check_front_sectors_blocked(
+                    threshold=0.3,  # Wyższy próg - musi być naprawdę blisko
+                    num_sectors=self.config.REVERSE_LIDAR_SECTORS
+                )
+                if not front_blocked:
+                    # LIDAR mówi że jest miejsce - NIE COFAJ!
+                    return None, "US_WARNING_ONLY"
+
+            # Faktycznie jest blisko - delikatnie cofnij
+            self.stabilizer.force_unlock()
+            self.hard_reflex_action = Action.REVERSE
+            self.hard_reflex_hold_remaining = 1  # Tylko 1 cykl!
+            return Action.REVERSE, "CLOSE_CALL"
+
+        return None
+        """
         scale = self.config.SAFETY_DIST_SPEED_SCALE
+    def validate_safety_constraints(self, us_left_dist: float, us_right_dist: float,
+                                   encoder_l: float, encoder_r: float,
+                                   rear_bumper: int = 0) -> Optional[Tuple[Action, str]]:
+        avg_speed = (encoder_l + encoder_r) / 2.0
+        dyn_us, _dyn_lidar = self._compute_dynamic_safety(avg_speed)
+
+        # --------------------------------------------------------------
+        # LIDAR HARD SAFETY - TYLKO PONIŻEJ 10 cm!
+        # --------------------------------------------------------------
+        if self.lidar.min_dist < self.config.LIDAR_HARD_SAFETY_MIN:  # 10 cm
+            # Anuluj wszystkie inne akcje
+            self.rear_bumper_forward_remaining = 0
+            self.stabilizer.force_unlock()
+
+            # Wybierz kierunek ucieczki
+            if us_left_dist > us_right_dist + 0.1:
+                self.hard_reflex_action = Action.TURN_LEFT
+            elif us_right_dist > us_left_dist + 0.1:
+                self.hard_reflex_action = Action.TURN_RIGHT
+            else:
+                # Oba boki podobne - sprawdź tył
+                rear_sectors = self.lidar.sectors_16[6:10]
+                rear_blocked = float(np.mean(rear_sectors)) > 0.6
+                if rear_blocked:
+                    # Wszędzie źle - spin
+                    self.hard_reflex_action = (Action.SPIN_LEFT if us_left_dist >= us_right_dist
+                                              else Action.SPIN_RIGHT)
+                else:
+                    self.hard_reflex_action = Action.REVERSE
+
+            self.hard_reflex_hold_remaining = self.config.HARD_REFLEX_HOLD_CYCLES
+            return self.hard_reflex_action, "LIDAR_HARD_SAFETY"
+
+        # --------------------------------------------------------------
+        # US CHECK - TYLKO PONIŻEJ 10-15 cm (dynamiczne)
+        # --------------------------------------------------------------
+        us_front_min = min(us_left_dist, us_right_dist)
+
+        # TYLKO gdy naprawdę blisko!
+        if 0.01 < us_front_min < dyn_us:  # dyn_us to 8-15 cm
+            # Sprawdź LIDAR czy potwierdza
+            if self.config.REVERSE_LIDAR_CHECK:
+                front_blocked = self.lidar.check_front_sectors_blocked(
+                    threshold=0.3,  # Wyższy próg - musi być naprawdę blisko
+                    num_sectors=self.config.REVERSE_LIDAR_SECTORS
+                )
+                if not front_blocked:
+                    # LIDAR mówi że jest miejsce - NIE COFAJ!
+                    return None, "US_WARNING_ONLY"
+
+            # Faktycznie jest blisko - delikatnie cofnij
+            self.stabilizer.force_unlock()
+            self.hard_reflex_action = Action.REVERSE
+            self.hard_reflex_hold_remaining = 1  # Tylko 1 cykl!
+            return Action.REVERSE, "CLOSE_CALL"
+
+        return None
         v = abs(avg_speed)
-        us = self.config.US_SAFETY_DIST + (scale * v)
-        us = max(self.config.SAFETY_US_MIN, min(self.config.SAFETY_US_MAX, us))
-        lr = self.config.LIDAR_SAFETY_RADIUS + (scale * v)
-        lr = max(self.config.SAFETY_LIDAR_MIN, min(self.config.SAFETY_LIDAR_MAX, lr))
-        return us, lr
 
     def validate_safety_constraints(self, us_left_dist: float, us_right_dist: float,
                                    encoder_l: float, encoder_r: float,
                                    rear_bumper: int = 0) -> Optional[Tuple[Action, str]]:
-        # Dummy implementation or simplified if needed, but I should copy from Turn 2 if possible.
-        # Since I can't fit it all, I will implement simplified safety check relying on Fusion/Loop logic which does safety too.
-        # Wait, the loop calls this? No, loop calls _decide_from_fusion in updated code.
-        # But loop also calls bumper_system.
-        # In Turn 2, validate_safety_constraints was defined but usage in loop was partially replaced by new logic?
-        # No, Turn 2 loop logic used validate_safety_constraints at start?
-        # Turn 2 loop:
-        # 1. Process sensors
-        # 2. Hierarchia Decyzyjna
-        # POZIOM 1: Damper -> bumper_system.check_collision
-        # POZIOM 2 & 3: _decide_from_fusion
-        # So validate_safety_constraints seems UNUSED in the loop shown in Turn 2!
-        # It was replaced by _decide_from_fusion and BumperSystem.
-        # So I can skip it or leave it empty?
-        # I'll include it for compatibility but empty.
+        avg_speed = (encoder_l + encoder_r) / 2.0
+        dyn_us, _dyn_lidar = self._compute_dynamic_safety(avg_speed)
+
+        # --------------------------------------------------------------
+        # LIDAR HARD SAFETY - TYLKO PONIŻEJ 10 cm!
+        # --------------------------------------------------------------
+        if self.lidar.min_dist < self.config.LIDAR_HARD_SAFETY_MIN:  # 10 cm
+            # Anuluj wszystkie inne akcje
+            self.rear_bumper_forward_remaining = 0
+            self.stabilizer.force_unlock()
+
+            # Wybierz kierunek ucieczki
+            if us_left_dist > us_right_dist + 0.1:
+                self.hard_reflex_action = Action.TURN_LEFT
+            elif us_right_dist > us_left_dist + 0.1:
+                self.hard_reflex_action = Action.TURN_RIGHT
+            else:
+                # Oba boki podobne - sprawdź tył
+                rear_sectors = self.lidar.sectors_16[6:10]
+                rear_blocked = float(np.mean(rear_sectors)) > 0.6
+                if rear_blocked:
+                    # Wszędzie źle - spin
+                    self.hard_reflex_action = (Action.SPIN_LEFT if us_left_dist >= us_right_dist
+                                              else Action.SPIN_RIGHT)
+                else:
+                    self.hard_reflex_action = Action.REVERSE
+
+            self.hard_reflex_hold_remaining = self.config.HARD_REFLEX_HOLD_CYCLES
+            return self.hard_reflex_action, "LIDAR_HARD_SAFETY"
+
+        # --------------------------------------------------------------
+        # US CHECK - TYLKO PONIŻEJ 10-15 cm (dynamiczne)
+        # --------------------------------------------------------------
+        us_front_min = min(us_left_dist, us_right_dist)
+
+        # TYLKO gdy naprawdę blisko!
+        if 0.01 < us_front_min < dyn_us:  # dyn_us to 8-15 cm
+            # Sprawdź LIDAR czy potwierdza
+            if self.config.REVERSE_LIDAR_CHECK:
+                front_blocked = self.lidar.check_front_sectors_blocked(
+                    threshold=0.3,  # Wyższy próg - musi być naprawdę blisko
+                    num_sectors=self.config.REVERSE_LIDAR_SECTORS
+                )
+                if not front_blocked:
+                    # LIDAR mówi że jest miejsce - NIE COFAJ!
+                    return None, "US_WARNING_ONLY"
+
+            # Faktycznie jest blisko - delikatnie cofnij
+            self.stabilizer.force_unlock()
+            self.hard_reflex_action = Action.REVERSE
+            self.hard_reflex_hold_remaining = 1  # Tylko 1 cykl!
+            return Action.REVERSE, "CLOSE_CALL"
+
+        return None
+        # US safety - od 8 cm do 15 cm zależnie od prędkości
+        us_safety = self.config.US_SAFETY_DIST + (scale * v)
+    def validate_safety_constraints(self, us_left_dist: float, us_right_dist: float,
+                                   encoder_l: float, encoder_r: float,
+                                   rear_bumper: int = 0) -> Optional[Tuple[Action, str]]:
+        avg_speed = (encoder_l + encoder_r) / 2.0
+        dyn_us, _dyn_lidar = self._compute_dynamic_safety(avg_speed)
+
+        # --------------------------------------------------------------
+        # LIDAR HARD SAFETY - TYLKO PONIŻEJ 10 cm!
+        # --------------------------------------------------------------
+        if self.lidar.min_dist < self.config.LIDAR_HARD_SAFETY_MIN:  # 10 cm
+            # Anuluj wszystkie inne akcje
+            self.rear_bumper_forward_remaining = 0
+            self.stabilizer.force_unlock()
+
+            # Wybierz kierunek ucieczki
+            if us_left_dist > us_right_dist + 0.1:
+                self.hard_reflex_action = Action.TURN_LEFT
+            elif us_right_dist > us_left_dist + 0.1:
+                self.hard_reflex_action = Action.TURN_RIGHT
+            else:
+                # Oba boki podobne - sprawdź tył
+                rear_sectors = self.lidar.sectors_16[6:10]
+                rear_blocked = float(np.mean(rear_sectors)) > 0.6
+                if rear_blocked:
+                    # Wszędzie źle - spin
+                    self.hard_reflex_action = (Action.SPIN_LEFT if us_left_dist >= us_right_dist
+                                              else Action.SPIN_RIGHT)
+                else:
+                    self.hard_reflex_action = Action.REVERSE
+
+            self.hard_reflex_hold_remaining = self.config.HARD_REFLEX_HOLD_CYCLES
+            return self.hard_reflex_action, "LIDAR_HARD_SAFETY"
+
+        # --------------------------------------------------------------
+        # US CHECK - TYLKO PONIŻEJ 10-15 cm (dynamiczne)
+        # --------------------------------------------------------------
+        us_front_min = min(us_left_dist, us_right_dist)
+
+        # TYLKO gdy naprawdę blisko!
+        if 0.01 < us_front_min < dyn_us:  # dyn_us to 8-15 cm
+            # Sprawdź LIDAR czy potwierdza
+            if self.config.REVERSE_LIDAR_CHECK:
+                front_blocked = self.lidar.check_front_sectors_blocked(
+                    threshold=0.3,  # Wyższy próg - musi być naprawdę blisko
+                    num_sectors=self.config.REVERSE_LIDAR_SECTORS
+                )
+                if not front_blocked:
+                    # LIDAR mówi że jest miejsce - NIE COFAJ!
+                    return None, "US_WARNING_ONLY"
+
+            # Faktycznie jest blisko - delikatnie cofnij
+            self.stabilizer.force_unlock()
+            self.hard_reflex_action = Action.REVERSE
+            self.hard_reflex_hold_remaining = 1  # Tylko 1 cykl!
+            return Action.REVERSE, "CLOSE_CALL"
+
+        return None
+        us_safety = max(self.config.SAFETY_US_MIN,
+                        min(self.config.SAFETY_US_MAX, us_safety))
+    def validate_safety_constraints(self, us_left_dist: float, us_right_dist: float,
+                                   encoder_l: float, encoder_r: float,
+                                   rear_bumper: int = 0) -> Optional[Tuple[Action, str]]:
+        avg_speed = (encoder_l + encoder_r) / 2.0
+        dyn_us, _dyn_lidar = self._compute_dynamic_safety(avg_speed)
+
+        # --------------------------------------------------------------
+        # LIDAR HARD SAFETY - TYLKO PONIŻEJ 10 cm!
+        # --------------------------------------------------------------
+        if self.lidar.min_dist < self.config.LIDAR_HARD_SAFETY_MIN:  # 10 cm
+            # Anuluj wszystkie inne akcje
+            self.rear_bumper_forward_remaining = 0
+            self.stabilizer.force_unlock()
+
+            # Wybierz kierunek ucieczki
+            if us_left_dist > us_right_dist + 0.1:
+                self.hard_reflex_action = Action.TURN_LEFT
+            elif us_right_dist > us_left_dist + 0.1:
+                self.hard_reflex_action = Action.TURN_RIGHT
+            else:
+                # Oba boki podobne - sprawdź tył
+                rear_sectors = self.lidar.sectors_16[6:10]
+                rear_blocked = float(np.mean(rear_sectors)) > 0.6
+                if rear_blocked:
+                    # Wszędzie źle - spin
+                    self.hard_reflex_action = (Action.SPIN_LEFT if us_left_dist >= us_right_dist
+                                              else Action.SPIN_RIGHT)
+                else:
+                    self.hard_reflex_action = Action.REVERSE
+
+            self.hard_reflex_hold_remaining = self.config.HARD_REFLEX_HOLD_CYCLES
+            return self.hard_reflex_action, "LIDAR_HARD_SAFETY"
+
+        # --------------------------------------------------------------
+        # US CHECK - TYLKO PONIŻEJ 10-15 cm (dynamiczne)
+        # --------------------------------------------------------------
+        us_front_min = min(us_left_dist, us_right_dist)
+
+        # TYLKO gdy naprawdę blisko!
+        if 0.01 < us_front_min < dyn_us:  # dyn_us to 8-15 cm
+            # Sprawdź LIDAR czy potwierdza
+            if self.config.REVERSE_LIDAR_CHECK:
+                front_blocked = self.lidar.check_front_sectors_blocked(
+                    threshold=0.3,  # Wyższy próg - musi być naprawdę blisko
+                    num_sectors=self.config.REVERSE_LIDAR_SECTORS
+                )
+                if not front_blocked:
+                    # LIDAR mówi że jest miejsce - NIE COFAJ!
+                    return None, "US_WARNING_ONLY"
+
+            # Faktycznie jest blisko - delikatnie cofnij
+            self.stabilizer.force_unlock()
+            self.hard_reflex_action = Action.REVERSE
+            self.hard_reflex_hold_remaining = 1  # Tylko 1 cykl!
+            return Action.REVERSE, "CLOSE_CALL"
+
+        return None
+
+        # LIDAR safety - analogicznie
+    def validate_safety_constraints(self, us_left_dist: float, us_right_dist: float,
+                                   encoder_l: float, encoder_r: float,
+                                   rear_bumper: int = 0) -> Optional[Tuple[Action, str]]:
+        avg_speed = (encoder_l + encoder_r) / 2.0
+        dyn_us, _dyn_lidar = self._compute_dynamic_safety(avg_speed)
+
+        # --------------------------------------------------------------
+        # LIDAR HARD SAFETY - TYLKO PONIŻEJ 10 cm!
+        # --------------------------------------------------------------
+        if self.lidar.min_dist < self.config.LIDAR_HARD_SAFETY_MIN:  # 10 cm
+            # Anuluj wszystkie inne akcje
+            self.rear_bumper_forward_remaining = 0
+            self.stabilizer.force_unlock()
+
+            # Wybierz kierunek ucieczki
+            if us_left_dist > us_right_dist + 0.1:
+                self.hard_reflex_action = Action.TURN_LEFT
+            elif us_right_dist > us_left_dist + 0.1:
+                self.hard_reflex_action = Action.TURN_RIGHT
+            else:
+                # Oba boki podobne - sprawdź tył
+                rear_sectors = self.lidar.sectors_16[6:10]
+                rear_blocked = float(np.mean(rear_sectors)) > 0.6
+                if rear_blocked:
+                    # Wszędzie źle - spin
+                    self.hard_reflex_action = (Action.SPIN_LEFT if us_left_dist >= us_right_dist
+                                              else Action.SPIN_RIGHT)
+                else:
+                    self.hard_reflex_action = Action.REVERSE
+
+            self.hard_reflex_hold_remaining = self.config.HARD_REFLEX_HOLD_CYCLES
+            return self.hard_reflex_action, "LIDAR_HARD_SAFETY"
+
+        # --------------------------------------------------------------
+        # US CHECK - TYLKO PONIŻEJ 10-15 cm (dynamiczne)
+        # --------------------------------------------------------------
+        us_front_min = min(us_left_dist, us_right_dist)
+
+        # TYLKO gdy naprawdę blisko!
+        if 0.01 < us_front_min < dyn_us:  # dyn_us to 8-15 cm
+            # Sprawdź LIDAR czy potwierdza
+            if self.config.REVERSE_LIDAR_CHECK:
+                front_blocked = self.lidar.check_front_sectors_blocked(
+                    threshold=0.3,  # Wyższy próg - musi być naprawdę blisko
+                    num_sectors=self.config.REVERSE_LIDAR_SECTORS
+                )
+                if not front_blocked:
+                    # LIDAR mówi że jest miejsce - NIE COFAJ!
+                    return None, "US_WARNING_ONLY"
+
+            # Faktycznie jest blisko - delikatnie cofnij
+            self.stabilizer.force_unlock()
+            self.hard_reflex_action = Action.REVERSE
+            self.hard_reflex_hold_remaining = 1  # Tylko 1 cykl!
+            return Action.REVERSE, "CLOSE_CALL"
+
+        return None
+    def validate_safety_constraints(self, us_left_dist: float, us_right_dist: float,
+                                   encoder_l: float, encoder_r: float,
+                                   rear_bumper: int = 0) -> Optional[Tuple[Action, str]]:
+        avg_speed = (encoder_l + encoder_r) / 2.0
+        dyn_us, _dyn_lidar = self._compute_dynamic_safety(avg_speed)
+
+        # --------------------------------------------------------------
+        # LIDAR HARD SAFETY - TYLKO PONIŻEJ 10 cm!
+        # --------------------------------------------------------------
+        if self.lidar.min_dist < self.config.LIDAR_HARD_SAFETY_MIN:  # 10 cm
+            # Anuluj wszystkie inne akcje
+            self.rear_bumper_forward_remaining = 0
+            self.stabilizer.force_unlock()
+
+            # Wybierz kierunek ucieczki
+            if us_left_dist > us_right_dist + 0.1:
+                self.hard_reflex_action = Action.TURN_LEFT
+            elif us_right_dist > us_left_dist + 0.1:
+                self.hard_reflex_action = Action.TURN_RIGHT
+            else:
+                # Oba boki podobne - sprawdź tył
+                rear_sectors = self.lidar.sectors_16[6:10]
+                rear_blocked = float(np.mean(rear_sectors)) > 0.6
+                if rear_blocked:
+                    # Wszędzie źle - spin
+                    self.hard_reflex_action = (Action.SPIN_LEFT if us_left_dist >= us_right_dist
+                                              else Action.SPIN_RIGHT)
+                else:
+                    self.hard_reflex_action = Action.REVERSE
+
+            self.hard_reflex_hold_remaining = self.config.HARD_REFLEX_HOLD_CYCLES
+            return self.hard_reflex_action, "LIDAR_HARD_SAFETY"
+
+        # --------------------------------------------------------------
+        # US CHECK - TYLKO PONIŻEJ 10-15 cm (dynamiczne)
+        # --------------------------------------------------------------
+        us_front_min = min(us_left_dist, us_right_dist)
+
+        # TYLKO gdy naprawdę blisko!
+        if 0.01 < us_front_min < dyn_us:  # dyn_us to 8-15 cm
+            # Sprawdź LIDAR czy potwierdza
+            if self.config.REVERSE_LIDAR_CHECK:
+                front_blocked = self.lidar.check_front_sectors_blocked(
+                    threshold=0.3,  # Wyższy próg - musi być naprawdę blisko
+                    num_sectors=self.config.REVERSE_LIDAR_SECTORS
+                )
+                if not front_blocked:
+                    # LIDAR mówi że jest miejsce - NIE COFAJ!
+                    return None, "US_WARNING_ONLY"
+
+            # Faktycznie jest blisko - delikatnie cofnij
+            self.stabilizer.force_unlock()
+            self.hard_reflex_action = Action.REVERSE
+            self.hard_reflex_hold_remaining = 1  # Tylko 1 cykl!
+            return Action.REVERSE, "CLOSE_CALL"
+
+        return None
+
+    def validate_safety_constraints(self, us_left_dist: float, us_right_dist: float,
+                                   encoder_l: float, encoder_r: float,
+                                   rear_bumper: int = 0) -> Optional[Tuple[Action, str]]:
+        avg_speed = (encoder_l + encoder_r) / 2.0
+        dyn_us, _dyn_lidar = self._compute_dynamic_safety(avg_speed)
+
+        # --------------------------------------------------------------
+        # LIDAR HARD SAFETY - TYLKO PONIŻEJ 10 cm!
+        # --------------------------------------------------------------
+        if self.lidar.min_dist < self.config.LIDAR_HARD_SAFETY_MIN:  # 10 cm
+            # Anuluj wszystkie inne akcje
+            self.rear_bumper_forward_remaining = 0
+            self.stabilizer.force_unlock()
+
+            # Wybierz kierunek ucieczki
+            if us_left_dist > us_right_dist + 0.1:
+                self.hard_reflex_action = Action.TURN_LEFT
+            elif us_right_dist > us_left_dist + 0.1:
+                self.hard_reflex_action = Action.TURN_RIGHT
+            else:
+                # Oba boki podobne - sprawdź tył
+                rear_sectors = self.lidar.sectors_16[6:10]
+                rear_blocked = float(np.mean(rear_sectors)) > 0.6
+                if rear_blocked:
+                    # Wszędzie źle - spin
+                    self.hard_reflex_action = (Action.SPIN_LEFT if us_left_dist >= us_right_dist
+                                              else Action.SPIN_RIGHT)
+                else:
+                    self.hard_reflex_action = Action.REVERSE
+
+            self.hard_reflex_hold_remaining = self.config.HARD_REFLEX_HOLD_CYCLES
+            return self.hard_reflex_action, "LIDAR_HARD_SAFETY"
+
+        # --------------------------------------------------------------
+        # US CHECK - TYLKO PONIŻEJ 10-15 cm (dynamiczne)
+        # --------------------------------------------------------------
+        us_front_min = min(us_left_dist, us_right_dist)
+
+        # TYLKO gdy naprawdę blisko!
+        if 0.01 < us_front_min < dyn_us:  # dyn_us to 8-15 cm
+            # Sprawdź LIDAR czy potwierdza
+            if self.config.REVERSE_LIDAR_CHECK:
+                front_blocked = self.lidar.check_front_sectors_blocked(
+                    threshold=0.3,  # Wyższy próg - musi być naprawdę blisko
+                    num_sectors=self.config.REVERSE_LIDAR_SECTORS
+                )
+                if not front_blocked:
+                    # LIDAR mówi że jest miejsce - NIE COFAJ!
+                    return None, "US_WARNING_ONLY"
+
+            # Faktycznie jest blisko - delikatnie cofnij
+            self.stabilizer.force_unlock()
+            self.hard_reflex_action = Action.REVERSE
+            self.hard_reflex_hold_remaining = 1  # Tylko 1 cykl!
+            return Action.REVERSE, "CLOSE_CALL"
+
+        return None
+        return us_safety, lidar_safety
+    def validate_safety_constraints(self, us_left_dist: float, us_right_dist: float,
+                                   encoder_l: float, encoder_r: float,
+                                   rear_bumper: int = 0) -> Optional[Tuple[Action, str]]:
+        avg_speed = (encoder_l + encoder_r) / 2.0
+        dyn_us, _dyn_lidar = self._compute_dynamic_safety(avg_speed)
+
+        # --------------------------------------------------------------
+        # LIDAR HARD SAFETY - TYLKO PONIŻEJ 10 cm!
+        # --------------------------------------------------------------
+        if self.lidar.min_dist < self.config.LIDAR_HARD_SAFETY_MIN:  # 10 cm
+            # Anuluj wszystkie inne akcje
+            self.rear_bumper_forward_remaining = 0
+            self.stabilizer.force_unlock()
+
+            # Wybierz kierunek ucieczki
+            if us_left_dist > us_right_dist + 0.1:
+                self.hard_reflex_action = Action.TURN_LEFT
+            elif us_right_dist > us_left_dist + 0.1:
+                self.hard_reflex_action = Action.TURN_RIGHT
+            else:
+                # Oba boki podobne - sprawdź tył
+                rear_sectors = self.lidar.sectors_16[6:10]
+                rear_blocked = float(np.mean(rear_sectors)) > 0.6
+                if rear_blocked:
+                    # Wszędzie źle - spin
+                    self.hard_reflex_action = (Action.SPIN_LEFT if us_left_dist >= us_right_dist
+                                              else Action.SPIN_RIGHT)
+                else:
+                    self.hard_reflex_action = Action.REVERSE
+
+            self.hard_reflex_hold_remaining = self.config.HARD_REFLEX_HOLD_CYCLES
+            return self.hard_reflex_action, "LIDAR_HARD_SAFETY"
+
+        # --------------------------------------------------------------
+        # US CHECK - TYLKO PONIŻEJ 10-15 cm (dynamiczne)
+        # --------------------------------------------------------------
+        us_front_min = min(us_left_dist, us_right_dist)
+
+        # TYLKO gdy naprawdę blisko!
+        if 0.01 < us_front_min < dyn_us:  # dyn_us to 8-15 cm
+            # Sprawdź LIDAR czy potwierdza
+            if self.config.REVERSE_LIDAR_CHECK:
+                front_blocked = self.lidar.check_front_sectors_blocked(
+                    threshold=0.3,  # Wyższy próg - musi być naprawdę blisko
+                    num_sectors=self.config.REVERSE_LIDAR_SECTORS
+                )
+                if not front_blocked:
+                    # LIDAR mówi że jest miejsce - NIE COFAJ!
+                    return None, "US_WARNING_ONLY"
+
+            # Faktycznie jest blisko - delikatnie cofnij
+            self.stabilizer.force_unlock()
+            self.hard_reflex_action = Action.REVERSE
+            self.hard_reflex_hold_remaining = 1  # Tylko 1 cykl!
+            return Action.REVERSE, "CLOSE_CALL"
+
+        return None
+
+    def validate_safety_constraints(self, us_left_dist: float, us_right_dist: float,
+                                   encoder_l: float, encoder_r: float,
+                                   rear_bumper: int = 0) -> Optional[Tuple[Action, str]]:
+        avg_speed = (encoder_l + encoder_r) / 2.0
+        dyn_us, _dyn_lidar = self._compute_dynamic_safety(avg_speed)
+
+        # --------------------------------------------------------------
+        # LIDAR HARD SAFETY - TYLKO PONIŻEJ 10 cm!
+        # --------------------------------------------------------------
+        if self.lidar.min_dist < self.config.LIDAR_HARD_SAFETY_MIN:  # 10 cm
+            # Anuluj wszystkie inne akcje
+            self.rear_bumper_forward_remaining = 0
+            self.stabilizer.force_unlock()
+
+            # Wybierz kierunek ucieczki
+            if us_left_dist > us_right_dist + 0.1:
+                self.hard_reflex_action = Action.TURN_LEFT
+            elif us_right_dist > us_left_dist + 0.1:
+                self.hard_reflex_action = Action.TURN_RIGHT
+            else:
+                # Oba boki podobne - sprawdź tył
+                rear_sectors = self.lidar.sectors_16[6:10]
+                rear_blocked = float(np.mean(rear_sectors)) > 0.6
+                if rear_blocked:
+                    # Wszędzie źle - spin
+                    self.hard_reflex_action = (Action.SPIN_LEFT if us_left_dist >= us_right_dist
+                                              else Action.SPIN_RIGHT)
+                else:
+                    self.hard_reflex_action = Action.REVERSE
+
+            self.hard_reflex_hold_remaining = self.config.HARD_REFLEX_HOLD_CYCLES
+            return self.hard_reflex_action, "LIDAR_HARD_SAFETY"
+
+        # --------------------------------------------------------------
+        # US CHECK - TYLKO PONIŻEJ 10-15 cm (dynamiczne)
+        # --------------------------------------------------------------
+        us_front_min = min(us_left_dist, us_right_dist)
+
+        # TYLKO gdy naprawdę blisko!
+        if 0.01 < us_front_min < dyn_us:  # dyn_us to 8-15 cm
+            # Sprawdź LIDAR czy potwierdza
+            if self.config.REVERSE_LIDAR_CHECK:
+                front_blocked = self.lidar.check_front_sectors_blocked(
+                    threshold=0.3,  # Wyższy próg - musi być naprawdę blisko
+                    num_sectors=self.config.REVERSE_LIDAR_SECTORS
+                )
+                if not front_blocked:
+                    # LIDAR mówi że jest miejsce - NIE COFAJ!
+                    return None, "US_WARNING_ONLY"
+
+            # Faktycznie jest blisko - delikatnie cofnij
+            self.stabilizer.force_unlock()
+            self.hard_reflex_action = Action.REVERSE
+            self.hard_reflex_hold_remaining = 1  # Tylko 1 cykl!
+            return Action.REVERSE, "CLOSE_CALL"
+
         return None
 
     def _decide_from_fusion(self, enc_l, enc_r) -> Tuple[Optional[Action], str]:
@@ -2536,6 +3156,15 @@ class SwarmCoreV55:
                   concept_suggestion = None
                   if best_concept:
                       concept_suggestion = self.concept_graph.get_next_action_from_concept(best_concept)
+                  # Loguj koncepty TYLKO co 50 cykli i gdy się zmieniają
+                  if self.cycle_count % 50 == 0:
+                      if not hasattr(self, "_last_concept") or self._last_concept != best_concept.name:
+                          self._last_concept = best_concept.name
+                          logger.info(
+                              f"[CONCEPT] Uzyto konceptu '{best_concept.name}' "
+                              f"(aktywacja={best_concept.activation:.2f}) "
+                              f"-> sugestia: {concept_suggestion.name if concept_suggestion else 'None'}"
+                          )
 
                   forced_turn = self.anti_stagnation.should_force_turn()
                   if forced_turn is not None:
@@ -2564,6 +3193,17 @@ class SwarmCoreV55:
             self.stabilizer.force_unlock()
 
         reward = self.damper.compute_reward(encoder_l, encoder_r, motor_current, final_action)
+        # NOWE: KARA za niepotrzebne cofanie!
+        if final_action == Action.REVERSE and self.lidar.min_dist > 0.20:  # >20 cm
+            unnecessary_penalty = -2.0 * (self.lidar.min_dist / 0.5)  # Kara proporcjonalna
+            reward += unnecessary_penalty
+            if self.cycle_count % 50 == 0:
+                logger.info(f"⚠️ Niepotrzebne cofanie! dist={self.lidar.min_dist:.2f}m kara={unnecessary_penalty:.1f}")
+
+        # NAGRODA za odważną jazdę do przodu
+        if final_action == Action.FORWARD and self.lidar.min_dist < 0.30:  # 20-30 cm
+            bravery_bonus = 1.0 * (1.0 - self.lidar.min_dist/0.3)  # Im bliżej, tym więcej
+            reward += bravery_bonus
 
         # Penalize stall
         if self.encoder_monitor.is_stalled():
@@ -2695,6 +3335,36 @@ class SwarmCoreV55:
 
         pwm_l = np.clip(pwm_l, -self.config.PWM_MAX, self.config.PWM_MAX)
         pwm_r = np.clip(pwm_r, -self.config.PWM_MAX, self.config.PWM_MAX)
+        # 22. Pelna diagnostyka co 50 cykli - WERSJA PREYZYJNA!
+        if self.cycle_count % 50 == 0:
+            # Bezpieczne pobieranie wartości
+            q_vals = self.brain.q_approx.predict_q(features) # Uzywamy q_approx bezposrednio
+            gate_weights = np.zeros(2) # Brak gate w DualLinear
+
+            # Formatowanie Q - zawsze pokazuj min i max
+            q_min = np.min(q_vals)
+            q_max = np.max(q_vals)
+            q_norm = np.linalg.norm(q_vals)
+
+            # Jedna, czysta linia logu - DOKŁADNIE TAK JAK W TWOIM PRZYKŁADZIE!
+            logger.info(
+                f"[DIAG] c={self.cycle_count} "
+                f"PWM=({pwm_l:+.0f},{pwm_r:+.0f}) "
+                f"USL={us_left_dist:.2f} USR={us_right_dist:.2f} "
+                f"Lmin={self.lidar.min_dist:.2f} "
+                f"act={final_action.name} src={source} "
+                f"Lx={directional_bias:+.2f} Lz={aggression_factor:.2f} "
+                f"front_clr={front_clearance:.2f} "
+                f"free_ang={math.degrees(free_angle):+.0f}deg "
+                f"mag={free_mag:.2f} "
+                f"stag={'STAGNANT' if self.anti_stagnation.is_stagnant else 'ok'} "
+                f"Q=[{q_min:+.2f},{q_max:+.2f}] "
+                f"Qnrm={q_norm:.1f} "
+                f"eps={self.brain.epsilon:.3f} "
+                f"lr={self.brain.lr:.5f} "
+                f"buf={len(self.brain.replay_buffer)} "
+                f"CF=0" # Brak CF w tej wersji
+            )
 
         return pwm_l, pwm_r
         # POZIOM 1: Damper handled in loop
