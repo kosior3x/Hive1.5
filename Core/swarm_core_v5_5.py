@@ -1007,7 +1007,9 @@ class FeatureExtractor:
                 lorenz_x: float, lorenz_z: float,
                 rear_bumper: int, min_dist: float,
                 last_action: Optional[Action] = None,
-                free_angle: float = 0.0, free_mag: float = 0.0) -> np.ndarray:
+                free_angle: float = 0.0, free_mag: float = 0.0,
+                slip_ratio: float = 0.0, is_stalled: bool = False,
+                traj_correction: float = 0.0, stall_intensity: float = 0.0) -> np.ndarray:
         """
         Zwraca wektor 82 cech (float32).
         """
@@ -1623,10 +1625,12 @@ class NeuralHybridBrain:
 
     def get_features(self, lidar_16, us_left, us_right, encoder_l, encoder_r,
                      lorenz_x, lorenz_z, rear_bumper, min_dist, last_action=None,
-                     free_angle=0.0, free_mag=0.0) -> np.ndarray:
+                     free_angle=0.0, free_mag=0.0,
+                     slip_ratio=0.0, is_stalled=False, traj_correction=0.0, stall_intensity=0.0) -> np.ndarray:
         raw = self.feature_extractor.extract(
             lidar_16, us_left, us_right, encoder_l, encoder_r,
-            lorenz_x, lorenz_z, rear_bumper, min_dist, last_action, free_angle, free_mag
+            lorenz_x, lorenz_z, rear_bumper, min_dist, last_action, free_angle, free_mag,
+            slip_ratio, is_stalled, traj_correction, stall_intensity
         )
         self.normalizer.update(raw)
         return self.normalizer.normalize(raw)
@@ -1966,10 +1970,14 @@ class BumperSystem:
         # (Tu można dodać obsługę przednich/bocznych bumperów jeśli są w inputach)
         return None
 
+
 class EncoderMonitor:
     """
-    Monitoruje enkodery pod kątem poślizgu i blokady.
-    Liczy rzeczywistą prędkość.
+    Zaawansowany monitoring enkoderów:
+    - Wykrywanie poślizgu (slip)
+    - Wykrywanie blokady (stall)
+    - Korekcja toru jazdy
+    - Detekcja nierówności podłoża
     """
     def __init__(self, config: SwarmConfig):
         self.config = config
@@ -1978,40 +1986,139 @@ class EncoderMonitor:
         self.actual_l = 0.0
         self.actual_r = 0.0
 
+        # Historia dla detekcji trendów
+        self.actual_history = deque(maxlen=20)
+        self.expected_history = deque(maxlen=20)
+        self.slip_history = deque(maxlen=20)
+
+        # Liczniki
+        self.slip_count = 0
+        self.stall_count = 0
+        self.total_slip = 0.0
+
+        # Kalibracja
+        self.pwm_deadzone = 20  # PWM poniżej tego nie rusza
+        self.pwm_max_speed = 80  # PWM przy którym osiąga max speed
+
+    def pwm_to_speed(self, pwm: float) -> float:
+        """
+        Przelicza PWM na oczekiwaną prędkość [m/s].
+        Uwzględnia deadzone i nieliniowość silników.
+        """
+        pwm_abs = abs(pwm)
+        if pwm_abs < self.pwm_deadzone:
+            return 0.0
+
+        sign = 1.0 if pwm > 0 else -1.0
+        # Nieliniowa charakterystyka (silniki są nieliniowe)
+        ratio = ((pwm_abs - self.pwm_deadzone) / self.pwm_max_speed) ** 0.8
+        ratio = min(1.0, ratio)
+
+        return sign * ratio * self.config.MAX_SPEED_MPS
+
     def set_expected(self, pwm_l: float, pwm_r: float):
-        """
-        Przelicz PWM na oczekiwaną prędkość [m/s].
-        """
-        # Liniowa aproksymacja, max speed przy 100 PWM
-        # Uwzględnij deadzone silnika (np. < 20 PWM nie rusza)
-
-        def pwm_to_speed(pwm):
-            pwm_abs = abs(pwm)
-            if pwm_abs < 20: return 0.0
-            sign = 1.0 if pwm > 0 else -1.0
-            ratio = (pwm_abs - 20) / 80.0 # 0..1
-            return sign * ratio * self.config.MAX_SPEED_MPS
-
-        self.expected_l = pwm_to_speed(pwm_l)
-        self.expected_r = pwm_to_speed(pwm_r)
+        """Ustaw oczekiwane prędkości na podstawie PWM."""
+        self.expected_l = self.pwm_to_speed(pwm_l)
+        self.expected_r = self.pwm_to_speed(pwm_r)
+        self.expected_history.append((self.expected_l, self.expected_r))
 
     def update(self, enc_l: float, enc_r: float, dt: float):
-        # enc_l, enc_r to delta ticków? Czy absolutna pozycja?
-        # Zwykle w loop() dostajemy pozycję lub deltę.
-        # W SwarmCoreV55.loop(encoder_l, encoder_r) -> to są pozycje?
-        # "encoder_l: float, encoder_r: float" -> usually current speed or position.
-        # W kodzie: avg_speed = (encoder_l + encoder_r) / 2.0 -> Sugeruje prędkość [m/s] lub ticki/s.
-        # DCMotorController.update_pid(..., encoder_l, ...) -> PID na prędkość.
-        # Więc encoder_l/r to PRĘDKOŚĆ [m/s] lub znormalizowana.
-
-        # Zakładamy że to prędkość m/s
+        """
+        Aktualizuj rzeczywiste prędkości z enkoderów.
+        enc_l/r powinny być w [m/s]
+        """
         self.actual_l = enc_l
         self.actual_r = enc_r
+        self.actual_history.append((enc_l, enc_r))
+
+        # Oblicz poślizg dla każdego koła
+        slip_l = self._calculate_slip(self.expected_l, enc_l)
+        slip_r = self._calculate_slip(self.expected_r, enc_r)
+        self.slip_history.append((slip_l, slip_r))
+
+        # Aktualizuj liczniki
+        if slip_l > 0.3 or slip_r > 0.3:  # 30% poślizgu
+            self.slip_count += 1
+            self.total_slip += (slip_l + slip_r) / 2.0
+        else:
+            self.slip_count = max(0, self.slip_count - 0.5)
+
+        # Detekcja blokady (stall)
+        if abs(self.expected_l) > 0.1 and abs(enc_l) < 0.01:
+            self.stall_count += 1
+        elif abs(self.expected_r) > 0.1 and abs(enc_r) < 0.01:
+            self.stall_count += 1
+        else:
+            self.stall_count = max(0, self.stall_count - 0.5)
+
+    def _calculate_slip(self, expected: float, actual: float) -> float:
+        """
+        Oblicza poślizg (0-1). 0 = brak, 1 = całkowity poślizg.
+        """
+        if abs(expected) < 0.01:  # Nie spodziewamy się ruchu
+            return 0.0
+
+        # Różnica względna
+        if expected > 0:  # Jazda do przodu
+            if actual < 0:  # Koło kręci się w tył? (bardzo zły poślizg)
+                return 1.0
+            slip = max(0, (expected - actual) / expected)
+        else:  # Jazda do tyłu
+            if actual > 0:
+                return 1.0
+            slip = max(0, (abs(expected) - abs(actual)) / abs(expected))
+
+        return min(1.0, slip)
 
     def get_slip_ratio(self) -> float:
-        # Porównaj expected vs actual
-        # Jeśli expected duże, a actual małe -> poślizg/blokada
-        return 0.0 # TODO: Implementacja
+        """Średni poślizg w ostatnich N próbkach."""
+        if not self.slip_history:
+            return 0.0
+        avg_slip_l = sum(s[0] for s in self.slip_history) / len(self.slip_history)
+        avg_slip_r = sum(s[1] for s in self.slip_history) / len(self.slip_history)
+        return (avg_slip_l + avg_slip_r) / 2.0
+
+    def is_stalled(self) -> bool:
+        """Czy któreś koło jest zablokowane?"""
+        return self.stall_count > 5
+
+    def is_slipping(self) -> bool:
+        """Czy występuje znaczący poślizg?"""
+        return self.get_slip_ratio() > 0.2
+
+    def get_trajectory_correction(self) -> float:
+        """
+        Zwraca korekcję toru jazdy na podstawie różnicy enkoderów.
+        Pozytywna wartość = skręć w prawo, negatywna = skręć w lewo.
+        """
+        if len(self.actual_history) < 5:
+            return 0.0
+
+        # Średnia różnica w ostatnich 5 próbkach
+        recent = list(self.actual_history)[-5:]
+        avg_diff = sum(r[0] - r[1] for r in recent) / len(recent)
+
+        # Normalizuj do zakresu [-1, 1]
+        max_diff = self.config.MAX_SPEED_MPS * 0.2
+        correction = np.clip(avg_diff / max_diff, -1.0, 1.0)
+
+        return correction
+
+    def get_encoder_health(self) -> Dict:
+        """Diagnostyka enkoderów."""
+        return {
+            'slip_ratio': self.get_slip_ratio(),
+            'is_slipping': self.is_slipping(),
+            'is_stalled': self.is_stalled(),
+            'slip_count': self.slip_count,
+            'stall_count': self.stall_count,
+            'total_slip': self.total_slip,
+            'correction': self.get_trajectory_correction(),
+            'expected': (self.expected_l, self.expected_r),
+            'actual': (self.actual_l, self.actual_r)
+        }
+
+
 class DCMotorController:
     def __init__(self, config: SwarmConfig):
         self.config = config
@@ -2250,6 +2357,8 @@ class SwarmCoreV55:
         # 3. Zapisz do pliku pickle
         self.state_manager.save(data)
 
+
+
     def _load_state(self):
         saved = self.state_manager.load()
         if saved:
@@ -2258,10 +2367,22 @@ class SwarmCoreV55:
                 self.brain.normalizer.set_state(norm_state)
                 logger.info(f"Loaded normalizer: n={norm_state['n']} samples")
 
-            if 'q_weights' in saved and saved['q_weights'] is not None:
-                self.brain.q_approx.q_weights = np.array(saved['q_weights'])
-            if 'a_weights' in saved and saved['a_weights'] is not None:
-                self.brain.q_approx.a_weights = np.array(saved['a_weights'])
+            def load_weights(key, target_attr):
+                if key in saved and saved[key] is not None:
+                    loaded = np.array(saved[key])
+                    current = getattr(self.brain.q_approx, target_attr)
+                    if loaded.shape == current.shape:
+                        setattr(self.brain.q_approx, target_attr, loaded)
+                    elif loaded.shape[0] == current.shape[0] and loaded.shape[1] < current.shape[1]:
+                        diff = current.shape[1] - loaded.shape[1]
+                        logger.info(f"Padding {key}: {loaded.shape} -> {current.shape}")
+                        padded = np.pad(loaded, ((0,0), (0,diff)), mode='constant', constant_values=0)
+                        setattr(self.brain.q_approx, target_attr, padded)
+                    else:
+                        logger.warning(f"{key} shape mismatch: {loaded.shape} vs {current.shape}. Resetting.")
+
+            load_weights('q_weights', 'q_weights')
+            load_weights('a_weights', 'a_weights')
 
             self.brain.epsilon = saved.get('epsilon', self.config.EPSILON)
             self.brain.lr = saved.get('lr', self.config.LEARNING_RATE)
@@ -2280,7 +2401,6 @@ class SwarmCoreV55:
             lorenz_state = saved.get('lorenz_state')
             if lorenz_state:
                 self.lorenz.x, self.lorenz.y, self.lorenz.z = lorenz_state
-
     def _compute_dynamic_safety(self, avg_speed: float) -> Tuple[float, float]:
         scale = self.config.SAFETY_DIST_SPEED_SCALE
         v = abs(avg_speed)
@@ -2334,6 +2454,29 @@ class SwarmCoreV55:
                        return Action.SPIN_RIGHT, "SAFETY_SPIN"
         return None, "NORMAL"
 
+        # POZIOM 1: Damper handled in loop
+        # POZIOM 2: Blokada
+        if self.stuck_detector.update(self.fusion.front_dist, enc_l, enc_r):
+            logger.warning("STUCK DETECTED! Uwalniam robota...")
+            if self.fusion.rear_dist > 0.3:
+                return Action.REVERSE, "STUCK_REVERSE"
+            else:
+                if self.fusion.left_dist >= self.fusion.right_dist:
+                    return Action.SPIN_LEFT, "STUCK_SPIN_LEFT"
+                else:
+                    return Action.SPIN_RIGHT, "STUCK_SPIN_RIGHT"
+
+        # POZIOM 3: Bezpieczenstwo
+        if self.fusion.front_dist < self.config.LIDAR_HARD_SAFETY_MIN:
+             if self.fusion.rear_dist > 0.3:
+                  return Action.REVERSE, "SAFETY_REVERSE"
+             else:
+                  if self.fusion.left_dist >= self.fusion.right_dist:
+                       return Action.SPIN_LEFT, "SAFETY_SPIN"
+                  else:
+                       return Action.SPIN_RIGHT, "SAFETY_SPIN"
+        return None, "NORMAL"
+
     def loop(self, lidar_points: List[Tuple[float, float]],
              encoder_l: float, encoder_r: float,
              motor_current: float,
@@ -2342,6 +2485,11 @@ class SwarmCoreV55:
              dt: float = 0.033) -> Tuple[float, float]:
 
         self.cycle_count += 1
+
+        # 0. Update Encoder Monitor (Observe effect of previous action)
+        self.encoder_monitor.update(encoder_l, encoder_r, dt)
+        enc_stats = self.encoder_monitor.get_encoder_health()
+
         lidar_16 = self.lidar.process(lidar_points)
         self.fusion.update(us_left_dist, us_right_dist, lidar_16)
 
@@ -2376,7 +2524,12 @@ class SwarmCoreV55:
                       self.lorenz.x_norm, self.lorenz.z_norm,
                       rear_bumper, self.lidar.min_dist,
                       last_action=self._last_action_type,
-                      free_angle=free_angle, free_mag=free_mag)
+                      free_angle=free_angle, free_mag=free_mag,
+                      slip_ratio=enc_stats['slip_ratio'],
+                      is_stalled=enc_stats['is_stalled'],
+                      traj_correction=enc_stats['correction'],
+                      stall_intensity=enc_stats['stall_count'] / 10.0
+                  )
 
                   context = {'min_dist': self.lidar.min_dist, 'us_left': us_left_dist, 'us_right': us_right_dist}
                   best_concept = self.concept_graph.get_best_concept(context)
@@ -2411,6 +2564,12 @@ class SwarmCoreV55:
             self.stabilizer.force_unlock()
 
         reward = self.damper.compute_reward(encoder_l, encoder_r, motor_current, final_action)
+
+        # Penalize stall
+        if self.encoder_monitor.is_stalled():
+             logger.warning(f"STALL PENALTY applied")
+             reward -= 2.0
+
         sequence_reward = self.movement_tracker.get_sequence_reward()
         if sequence_reward != 0:
             reward += sequence_reward
@@ -2428,7 +2587,11 @@ class SwarmCoreV55:
                   self.lorenz.x_norm, self.lorenz.z_norm,
                   rear_bumper, self.lidar.min_dist,
                   last_action=self._last_action_type,
-                  free_angle=free_angle, free_mag=free_mag)
+                  free_angle=free_angle, free_mag=free_mag,
+                  slip_ratio=enc_stats['slip_ratio'],
+                  is_stalled=enc_stats['is_stalled'],
+                  traj_correction=enc_stats['correction'],
+                  stall_intensity=enc_stats['stall_count'] / 10.0)
 
         if self.brain.last_features is not None and self.brain.last_action is not None:
             oscillated = (
@@ -2490,10 +2653,39 @@ class SwarmCoreV55:
 
         pwm_l, pwm_r = self.motors.update_pid(target_l, target_r, encoder_l, encoder_r, dt)
 
+        # SLIP CORRECTION
+        if self.encoder_monitor.is_slipping() and final_action == Action.FORWARD:
+             pwm_l *= 0.8
+             pwm_r *= 0.8
+             logger.debug(f"Slip corrected PWM")
+
+        # TRAJECTORY CORRECTION
+        if final_action == Action.FORWARD:
+             correction = enc_stats['correction'] * 30.0
+             pwm_l -= correction
+             pwm_r += correction
+
+             # Also old corrections?
+             # The old code had:
+             # diff = encoder_l - encoder_r
+             # correction = diff * self.config.FORWARD_ENCODER_CORRECTION * 50.0
+             # EncoderMonitor.get_trajectory_correction uses history of diffs.
+             # I should use the new one.
+
+             micro_noise = directional_bias * self.config.FORWARD_LORENZ_PWM
+             pwm_l += micro_noise
+             pwm_r -= micro_noise
+
+        # Set expected for NEXT loop
+        self.encoder_monitor.set_expected(pwm_l, pwm_r)
+
         if final_action == Action.REVERSE:
             symmetric_pwm = -abs((pwm_l + pwm_r) / 2.0)
             pwm_l, pwm_r = symmetric_pwm, symmetric_pwm
             self.motors.sync_memory(pwm_l, pwm_r)
+
+        if final_action == Action.FORWARD:
+             self.motors.sync_memory(pwm_l, pwm_r)
 
         self.anti_stagnation.update(self.motors.x, self.motors.y, (abs(pwm_l)+abs(pwm_r))/2.0, final_action)
         if final_action in (Action.TURN_LEFT, Action.TURN_RIGHT, Action.SPIN_LEFT, Action.SPIN_RIGHT):
@@ -2501,20 +2693,33 @@ class SwarmCoreV55:
                  self.lorenz.x_norm, self.lorenz.z_norm, pwm_l, pwm_r
              )
 
-        if final_action == Action.FORWARD:
-             diff = encoder_l - encoder_r
-             correction = diff * self.config.FORWARD_ENCODER_CORRECTION * 50.0
-             pwm_l -= correction
-             pwm_r += correction
-             micro_noise = directional_bias * self.config.FORWARD_LORENZ_PWM
-             pwm_l += micro_noise
-             pwm_r -= micro_noise
-             self.motors.sync_memory(pwm_l, pwm_r)
-
         pwm_l = np.clip(pwm_l, -self.config.PWM_MAX, self.config.PWM_MAX)
         pwm_r = np.clip(pwm_r, -self.config.PWM_MAX, self.config.PWM_MAX)
 
         return pwm_l, pwm_r
+        # POZIOM 1: Damper handled in loop
+        # POZIOM 2: Blokada
+        if self.stuck_detector.update(self.fusion.front_dist, enc_l, enc_r):
+            logger.warning("STUCK DETECTED! Uwalniam robota...")
+            if self.fusion.rear_dist > 0.3:
+                return Action.REVERSE, "STUCK_REVERSE"
+            else:
+                if self.fusion.left_dist >= self.fusion.right_dist:
+                    return Action.SPIN_LEFT, "STUCK_SPIN_LEFT"
+                else:
+                    return Action.SPIN_RIGHT, "STUCK_SPIN_RIGHT"
+
+        # POZIOM 3: Bezpieczenstwo
+        if self.fusion.front_dist < self.config.LIDAR_HARD_SAFETY_MIN:
+             if self.fusion.rear_dist > 0.3:
+                  return Action.REVERSE, "SAFETY_REVERSE"
+             else:
+                  if self.fusion.left_dist >= self.fusion.right_dist:
+                       return Action.SPIN_LEFT, "SAFETY_SPIN"
+                  else:
+                       return Action.SPIN_RIGHT, "SAFETY_SPIN"
+        return None, "NORMAL"
+
 
     def get_stats(self) -> Dict:
         return {
