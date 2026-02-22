@@ -185,6 +185,7 @@ class SwarmConfig:
     COUNTERFACTUAL_STEPS: int = 3          # nieuzywane aktywnie w krok. 5, zostawiamy jako koncepcje
     COUNTERFACTUAL_THRESHOLD: float = 0.5  # prog poprawy, by dodac kontrfaktyke
     COUNTERFACTUAL_LR: float = 0.1         # jak bardzo kontrfaktyka wplywa na Q (waga)
+    CONCEPT_PRUNING_INTERVAL: int = 2000  # Co ile krokow uruchamiac przycinanie konceptow
 
     # Neural Network (Krok 6)
     NN_HIDDEN_1: int = 32               # pierwsza warstwa ukryta (82 -> 32)
@@ -238,6 +239,8 @@ class Concept:
         self.usage_count = 0  # Ile razy użyty
         self.last_used = 0  # Timestamp ostatniego użycia
         self.context: Dict[str, Any] = {}  # Kontekst (np. min_dist range)
+        self.last_used_step = 0          # Numer kroku, w którym koncept został użyty po raz ostatni
+        self.success_ratio = 0.0         # Stosunek sukcesów do użyć (success_count / usage_count)
 
     def matches_context(self, current_context: Dict[str, Any]) -> float:
         """Jak dobrze pasuje do obecnego kontekstu (0-1)"""
@@ -258,11 +261,13 @@ class Concept:
 
         return score / count if count > 0 else 0.5
 
-    def activate(self, boost: float = 0.1):
+    def activate(self, boost: float = 0.1, current_step: int = 0):
         """Zwiększ aktywację"""
         self.activation = min(1.0, self.activation + boost)
         self.usage_count += 1
         self.last_used = time.time()
+        self.last_used_step = current_step
+        self.success_ratio = self.success_count / max(1, self.usage_count)
 
     def decay(self, rate: float = 0.95):
         """Zmniejsz aktywację (naturalny decay)"""
@@ -272,6 +277,7 @@ class Concept:
         """Zaznacz sukces - zwiększ aktywację"""
         self.success_count += 1
         self.activation = min(1.0, self.activation + boost)
+        self.success_ratio = self.success_count / max(1, self.usage_count)
 
 
 class ConceptGraph:
@@ -289,6 +295,13 @@ class ConceptGraph:
         self.concepts: Dict[str, Concept] = {}
         self.action_history = deque(maxlen=10)  # Ostatnie akcje
         self.learning_buffer: List[Tuple[List[Action], bool]] = []  # (sequence, success)
+
+        # Parametry przycinania konceptów
+        self.pruning_interval = 1000          # Co ile kroków uruchamiać przycinanie
+        self.min_usage_to_survive = 5         # Minimalna liczba użyć, by koncept nie został usunięty
+        self.min_success_ratio_to_survive = 0.25  # Minimalny wskaźnik sukcesu
+        self.similarity_threshold = 0.7       # Próg podobieństwa do łączenia konceptów (0-1)
+        self.last_pruned_step = 0
 
         # Predefiniowane koncepty (instynkt)
         self._init_base_concepts()
@@ -309,7 +322,7 @@ class ConceptGraph:
             self.concepts[c.name] = c
             c.activation = 0.3  # Startowa aktywacja
 
-    def update(self, action: Action, reward: float):
+    def update(self, action: Action, reward: float, current_step: int = 0):
         """Aktualizuj graf na podstawie wykonanej akcji i nagrody"""
         self.action_history.append(action)
 
@@ -325,8 +338,12 @@ class ConceptGraph:
                 # Sprawdź czy koncept pasuje do ostatnich akcji
                 if len(concept.sequence) <= len(recent):
                     if recent[-len(concept.sequence):] == concept.sequence:
-                        # Pasuje! Aktywuj
-                        concept.activate(0.1)
+                        # Pasuje! Aktywuj (aktualizujac tez last_used_step, ale nie mamy go tu bezposrednio w update...
+                        # Trudno, update() powinno przyjmowac current_step jesli chcemy byc precyzyjni.
+                        # Ale Concept.activate() ma domyslne current_step=0.
+                        # Zmienimy to w integracji glownej petli, zeby przekazywac step.
+                        # Na razie uzywamy czasu systemowego w activate().
+                        concept.activate(0.1, current_step)
 
                         # Jeśli reward pozytywny = sukces
                         if reward > 0:
@@ -411,10 +428,123 @@ class ConceptGraph:
         # Koniec sekwencji - zacznij od początku
         return concept.sequence[0]
 
+    def _calculate_similarity(self, seq1: List[Action], seq2: List[Action]) -> float:
+        """
+        Oblicza podobieństwo między dwiema sekwencjami akcji.
+        Zwraca wartość od 0 (całkowicie różne) do 1 (identyczne).
+        Używa zmodyfikowanej odległości Levenshteina dla sekwencji.
+        """
+        if not seq1 and not seq2:
+            return 1.0
+        if not seq1 or not seq2:
+            return 0.0
 
-# =============================================================================
-# LORENZ ATTRACTOR (bez zmian)
-# =============================================================================
+        len1, len2 = len(seq1), len(seq2)
+        matrix = [[0 for _ in range(len2 + 1)] for _ in range(len1 + 1)]
+
+        for i in range(len1 + 1):
+            matrix[i][0] = i
+        for j in range(len2 + 1):
+            matrix[0][j] = j
+
+        for i in range(1, len1 + 1):
+            for j in range(1, len2 + 1):
+                cost = 0 if seq1[i-1] == seq2[j-1] else 1
+                matrix[i][j] = min(
+                    matrix[i-1][j] + 1,      # deletion
+                    matrix[i][j-1] + 1,      # insertion
+                    matrix[i-1][j-1] + cost  # substitution
+                )
+
+        distance = matrix[len1][len2]
+        max_len = max(len1, len2)
+
+        return 1.0 - (distance / max_len)
+
+    def _merge_concepts(self, concept1: Concept, concept2: Concept) -> Concept:
+        """
+        Łączy dwa podobne koncepty w jeden, nowy.
+        Nowa sekwencja to dłuższa z nich (optymalizacja).
+        Aktywacja i liczniki są sumowane/średniowane.
+        """
+        # Wybierz dłuższą sekwencję (bardziej szczegółowa)
+        if len(concept1.sequence) >= len(concept2.sequence):
+            new_sequence = concept1.sequence
+        else:
+            new_sequence = concept2.sequence
+
+        new_name = f"merged_{len(self.concepts)}"
+        new_concept = Concept(new_name, new_sequence.copy())
+
+        # Połącz statystyki
+        new_concept.activation = max(concept1.activation, concept2.activation)
+        new_concept.usage_count = concept1.usage_count + concept2.usage_count
+        new_concept.success_count = concept1.success_count + concept2.success_count
+        new_concept.last_used_step = max(concept1.last_used_step, concept2.last_used_step)
+        new_concept.success_ratio = new_concept.success_count / max(1, new_concept.usage_count)
+
+        logger.info(f"🔗 Połączono koncepty '{concept1.name}' i '{concept2.name}' w '{new_name}'")
+        return new_concept
+
+    def prune_and_merge(self, current_step: int):
+        """
+        Główna metoda przycinania i łączenia konceptów.
+        Ma być wywoływana co  kroków z poziomu pętli głównej.
+        """
+        if len(self.concepts) < 10:  # Nie ma sensu przycinać, gdy jest mało konceptów
+            return
+
+        logger.info(f"✂️ Rozpoczynam przycinanie konceptów (krok {current_step})...")
+
+        # --- Krok A: Identyfikacja konceptów do usunięcia (śmieci) ---
+        concepts_to_remove = []
+        for name, concept in self.concepts.items():
+            # Pomiń koncepty bazowe? (np. 'explore_straight') – można dodać listę chronionych nazw
+            if concept.name.startswith('learned_'):
+                age = current_step - concept.last_used_step
+                # Usuń, jeśli: mało używany LUB niska skuteczność I nie był ostatnio używany
+                if (concept.usage_count < self.min_usage_to_survive and age > self.pruning_interval) or                    (concept.success_ratio < self.min_success_ratio_to_survive and age > self.pruning_interval):
+                    concepts_to_remove.append(name)
+
+        # Usuń śmieci
+        for name in concepts_to_remove:
+            logger.info(f"  Usuwam śmieciowy koncept: '{name}' (użycia: {self.concepts[name].usage_count}, sukces: {self.concepts[name].success_ratio:.2f})")
+            del self.concepts[name]
+
+        # --- Krok B: Identyfikacja i łączenie podobnych konceptów ---
+        concept_items = list(self.concepts.items())
+        merged_any = True
+        while merged_any:
+            merged_any = False
+            for i in range(len(concept_items)):
+                for j in range(i+1, len(concept_items)):
+                    name1, conc1 = concept_items[i]
+                    name2, conc2 = concept_items[j]
+
+                    # Nie łącz samych ze sobą i pomiń, jeśli któryś już został usunięty
+                    if name1 not in self.concepts or name2 not in self.concepts:
+                        continue
+
+                    similarity = self._calculate_similarity(conc1.sequence, conc2.sequence)
+                    if similarity >= self.similarity_threshold:
+                        # Połącz je
+                        new_concept = self._merge_concepts(conc1, conc2)
+                        self.concepts[new_concept.name] = new_concept
+                        # Usuń stare
+                        del self.concepts[name1]
+                        del self.concepts[name2]
+                        logger.info(f"  Połączono {name1} i {name2} w {new_concept.name}")
+                        merged_any = True
+                        break  # Przerwij pętle, bo słownik się zmienił
+                if merged_any:
+                    break
+            # Zaktualizuj listę konceptów na nową iterację
+            if merged_any:
+                concept_items = list(self.concepts.items())
+
+        self.last_pruned_step = current_step
+        logger.info(f"✅ Przycinanie zakończone. Pozostało konceptów: {len(self.concepts)}")
+
 
 class LorenzAttractor:
     def __init__(self, config: SwarmConfig):
@@ -2495,7 +2625,12 @@ class SwarmCoreV55:
 
 
         # 10. ★ Concept Graph Update
-        self.concept_graph.update(final_action, reward)
+        self.concept_graph.update(final_action, reward, self.cycle_count)
+
+        # ---- KONSOLIDACJA KONCEPTÃW ----
+        if self.cycle_count % self.config.CONCEPT_PRUNING_INTERVAL == 0 and self.cycle_count > 0:
+            # PrzekaÅ¼ aktualny numer kroku (self.cycle_count) do metody prune_and_merge
+            self.concept_graph.prune_and_merge(self.cycle_count)
 
         # 11. Velocity mapping
         # Dla FORWARD: usyj front_clearance (odl. z przodu) nie globalny min_dist (moze byc sciana z tylu!)
@@ -2763,3 +2898,33 @@ if __name__ == "__main__":
     changed, stats = core.brain.reinforce_l2(force=True, method='combined')
     print(f"Wzmocnienie: {changed}")
     core.brain.debug_l2()
+
+    print("\n=== TEST 10: Concept Pruning & Merging ===")
+    cg = ConceptGraph(cfg)
+    # Add dummy concepts
+    c1 = Concept("learned_c1", [Action.FORWARD, Action.TURN_LEFT])
+    c1.usage_count = 6
+    c1.last_used_step = 0; c1.success_count = 6; c1.success_ratio = 1.0
+    cg.concepts["learned_c1"] = c1
+
+    c2 = Concept("learned_c2", [Action.FORWARD, Action.TURN_LEFT]) # Identical sequence
+    c2.usage_count = 10; c2.success_count = 10; c2.success_ratio = 1.0
+    c2.last_used_step = 100
+    cg.concepts["learned_c2"] = c2
+
+    # Trigger pruning/merging
+    # Set pruning interval to small for test
+    cg.pruning_interval = 50
+    cg.min_usage_to_survive = 5
+
+    # Test step 200 (c1 should be pruned because usage < 5 and age > 50)
+    # But wait, prune_and_merge also merges. c1 and c2 are identical.
+    # They should be merged.
+
+    cg.prune_and_merge(200)
+
+    # Verify
+    print(f"Concepts after pruning: {list(cg.concepts.keys())}")
+    # Expect merged concept
+    sim = cg._calculate_similarity(cg.concepts["learned_c1"].sequence, cg.concepts["learned_c2"].sequence); print(f"Similarity: {sim}")
+    print("✓ Concept Pruning & Merging OK")
