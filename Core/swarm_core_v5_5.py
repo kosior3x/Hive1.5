@@ -2516,6 +2516,15 @@ class SwarmCoreV55:
 
         self.cycle_count += 1
 
+        # === INICJALIZACJA ZMIENNYCH (ZAPOBIEGA BŁĘDOM) ===
+        front_clearance = 1.0
+        free_angle = 0.0
+        free_mag = 0.0
+        directional_bias = 0.0
+        aggression_factor = 0.0
+        features = None
+        # =================================================
+
         # 0. Update Encoder Monitor (Observe effect of previous action)
         self.encoder_monitor.update(encoder_l, encoder_r, dt)
         enc_stats = self.encoder_monitor.get_encoder_health()
@@ -2568,7 +2577,13 @@ class SwarmCoreV55:
                       concept_suggestion = self.concept_graph.get_next_action_from_concept(best_concept)
                   # Loguj koncepty TYLKO co 50 cykli i gdy się zmieniają
                   if self.cycle_count % 50 == 0:
-                      if not hasattr(self, "_last_concept") or self._last_concept != best_concept.name:
+                      if best_concept and (not hasattr(self, "_last_concept") or self._last_concept != best_concept.name):
+                          self._last_concept = best_concept.name
+                          logger.info(
+                              f"[CONCEPT] Uzyto konceptu '{best_concept.name}' "
+                              f"(aktywacja={best_concept.activation:.2f}) "
+                              f"-> sugestia: {concept_suggestion.name if concept_suggestion else 'None'}"
+                          )
                           self._last_concept = best_concept.name
                           logger.info(
                               f"[CONCEPT] Uzyto konceptu '{best_concept.name}' "
@@ -2628,7 +2643,7 @@ class SwarmCoreV55:
             proximity_penalty = -2.0 * (1.0 - self.lidar.min_dist / 0.35)
             reward += proximity_penalty
 
-        if 'features' not in locals():
+        if features is None:
               self.lorenz.step()
               free_angle, free_mag = self.instinct.compute_free_space_vector(lidar_16)
               features = self.brain.get_features(
