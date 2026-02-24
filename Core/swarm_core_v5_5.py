@@ -1,4 +1,4 @@
-#!/usr/bin/env python3 ver5.503
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 =============================================================================
@@ -57,7 +57,7 @@ class SwarmConfig:
     WHEEL_BASE: float = 0.32         # rozstaw kół do odometrii [m]
     ROBOT_HALF_WIDTH: float = 0.16   # połowa rozstawu kół
     US_FORWARD_OFFSET: float = 0.29  # odległość US od osi obrotu [m]
-    MAX_SPEED_MPS: float = 0.5
+    MAX_SPEED_MPS: float = 0.75
     
     # Dystanse (NAPRAWIONE - 10cm target)
     US_SAFETY_DIST: float = 0.12
@@ -67,51 +67,51 @@ class SwarmConfig:
     
     SAFETY_DIST_SPEED_SCALE: float = 0.25
     SAFETY_US_MIN: float = 0.08
-    SAFETY_US_MAX: float = 0.25
+    SAFETY_US_MAX: float = 0.20
     SAFETY_LIDAR_MIN: float = 0.12
-    SAFETY_LIDAR_MAX: float = 0.35
+    SAFETY_LIDAR_MAX: float = 0.21
     # LIDAR hard safety — wymuszony REVERSE/TURN gdy za blisko ściany
-    LIDAR_HARD_SAFETY_MIN: float = 0.30  # Lmin poniżej tej wartości = natychmiastowa reakcja
-    HARD_REFLEX_HOLD_CYCLES: int = 3      # Krócej trzymaj akcję awaryjną
+    LIDAR_HARD_SAFETY_MIN: float = 0.10  # Lmin poniżej tej wartości = natychmiastowa reakcja
+    HARD_REFLEX_HOLD_CYCLES: int = 6      # Krócej trzymaj akcję awaryjną
     
     # Rear bumper
-    REAR_BUMPER_FORWARD_CYCLES: int = 3  # Ile cykli FORWARD po kolizji tylnej
+    REAR_BUMPER_FORWARD_CYCLES: int = 4  # Ile cykli FORWARD po kolizji tylnej
     
     # Korekcja jazdy prostej (encoder-based)
-    FORWARD_ENCODER_CORRECTION: float = 0.5  # Siła korekcji enkoderowej
+    FORWARD_ENCODER_CORRECTION: float = 0.65  # Siła korekcji enkoderowej
     FORWARD_LORENZ_PWM: float = 2.5       # Max ±PWM szum Lorenz przy FORWARD
     FORWARD_CHAOS_DAMPEN: float = 0.0      # Chaos inject = 0 dla FORWARD
     
     # Cofanie z LIDAR (NAPRAWIONE)
     REVERSE_LIDAR_CHECK: bool = True
-    REVERSE_LIDAR_SECTORS: int = 4
+    REVERSE_LIDAR_SECTORS: int = 5
     REVERSE_LIDAR_THRESHOLD: float = 0.15
     
     # Q-Learning (v5.9)
-    LEARNING_RATE: float = 0.001     # zmniejszone dla stabilności aproksymatora
+    LEARNING_RATE: float = 0.0005    # zmniejszone dla stabilności aproksymatora
     LR_DECAY: float = 0.99995        # mnożnik LR co krok (do 0.001 minimum)
     LR_MIN: float = 0.0005           # minimalne LR
     DISCOUNT_FACTOR: float = 0.9
-    EPSILON: float = 0.10            # eksploracja startowa
+    EPSILON: float = 0.18           # eksploracja startowa
     EPSILON_DECAY: float = 0.9999    # decay epsilon co krok
-    EPSILON_MIN: float = 0.02        # minimum epsilon (zawsze trochę eksploruje)
+    EPSILON_MIN: float = 0.025        # minimum epsilon (zawsze trochę eksploruje)
     
     # Replay Buffer
-    REPLAY_BUFFER_CAPACITY: int = 7000
+    REPLAY_BUFFER_CAPACITY: int = 8000
     REPLAY_BATCH_SIZE: int = 32
-    REPLAY_TRAIN_FREQ: int = 4       # trenuj co N kroków
+    REPLAY_TRAIN_FREQ: int = 50       # trenuj co N kroków
     
     # Concept Graph (NOWE - właściwe!)
-    CONCEPT_MIN_SEQUENCE: int = 3  # Min długość sekwencji dla konceptu
-    CONCEPT_ACTIVATION_THRESHOLD: float = 0.6  # Próg aktywacji
+    CONCEPT_MIN_SEQUENCE: int = 5  # Min długość sekwencji dla konceptu
+    CONCEPT_ACTIVATION_THRESHOLD: float = 0.87  # Próg aktywacji
     CONCEPT_DECAY_RATE: float = 0.95  # Decay per step
-    CONCEPT_SUCCESS_BOOST: float = 0.3  # Boost za sukces
+    CONCEPT_SUCCESS_BOOST: float = 0.5  # Boost za sukces
     
     # ★ Wall proximity — blokuj koncepty FORWARD gdy za blisko
     WALL_PROXIMITY_THRESHOLD: float = 0.50  # Lmin poniżej tego = koncept FORWARD zablokowany
     
     # ★ Anti-oscillation — zapobiegaj pętli REVERSE↔FORWARD
-    OSCILLATION_MAX_REPEATS: int = 12  # Po tylu powtórzeniach REVERSE → wymuś SPIN
+    OSCILLATION_MAX_REPEATS: int = 6  # Po tylu powtórzeniach REVERSE → wymuś SPIN
     
     # PID
     PID_KP: float = 1.2
@@ -124,12 +124,12 @@ class SwarmConfig:
     LORENZ_SIGMA: float = 10.0
     LORENZ_RHO: float = 28.0
     LORENZ_BETA: float = 8.0 / 3.0
-    LORENZ_DT: float = 0.01
-    LORENZ_AGGRESSION_SCALE: float = 0.25
-    LORENZ_BIAS_SCALE: float = 0.03      # Lorenz dla TURN/SPIN (zmniejszone 0.05->0.03)
+    LORENZ_DT: float = 0.015
+    LORENZ_AGGRESSION_SCALE: float = 0.35
+    LORENZ_BIAS_SCALE: float = 0.043      # Lorenz dla TURN/SPIN (zmniejszone 0.05->0.03)
     
     # Instinct — mocno wzmocniony, priorytet FORWARD na otwartej przestrzeni
-    INSTINCT_WEIGHT: float = 3.0          # 0.8→3.0 — instynkt dominuje nad Q przy wolnej przestrzeni
+    INSTINCT_WEIGHT: float = 2.5         # 0.8→3.0 — instynkt dominuje nad Q przy wolnej przestrzeni
     INSTINCT_REVERSE_PENALTY: float = 0.5 # Wyższy penalty dla REVERSE
     INSTINCT_US_BOOST: float = 1.2        # Mocniejszy US bias
     INSTINCT_CLEAR_THRESHOLD: float = 0.8 # Lmin > tej wartości = wyraźnie otwarta przestrzeń
@@ -143,14 +143,14 @@ class SwarmConfig:
     VELOCITY_MAX_SPEED: float = 1.0
     
     # Hysteresis
-    HYSTERESIS_THRESHOLD: int = 3
+    HYSTERESIS_THRESHOLD: int = 4
     LOCK_DURATION: int = 5
     
     # Anti-stagnation — okno wydłużone, próg wyższy (spin nie jest stagnacją!)
-    STAGNATION_WINDOW: int = 120          # 120 cykli = 4s przy 30Hz
-    STAGNATION_THRESHOLD: float = 0.03    # Wariancja pozycji [m²] — 10× wyższy
-    CHAOS_INJECT_STRENGTH: float = 0.3
-    STAGNATION_FORCE_TURN_CYCLES: int = 4   # Krócej wymuszać — potem niech Q decyduje
+    STAGNATION_WINDOW: int = 45       # 120 cykli = 4s przy 30Hz
+    STAGNATION_THRESHOLD: float = 0.035    # Wariancja pozycji [m²] — 10× wyższy
+    CHAOS_INJECT_STRENGTH: float = 0.5
+    STAGNATION_FORCE_TURN_CYCLES: int = 5   # Krócej wymuszać — potem niech Q decyduje
     
     # PWM limits
     PWM_MAX: float = 100.0  # Hard clamp PWM
@@ -164,16 +164,16 @@ class SwarmConfig:
     AVOIDANCE_LR_SCALE: float = 1.0      # mnoznik LR dla macierzy A
     # Krystalizacja wiedzy L2 (Krok 3)
     L2_FEATURES: int = 32                # liczba cech w warstwie L2
-    L2_MIN_SAMPLES: int = 5000           # minimalna liczba krokow przed krystalizacja
-    L2_LEARNING_RATE: float = 0.001      # learning rate dla aproksymatora L2
-    L2_UPDATE_FREQ: int = 1000           # co ile krokow aktualizowac statystyki waznosci
+    L2_MIN_SAMPLES: int = 8000           # minimalna liczba krokow przed krystalizacja
+    L2_LEARNING_RATE: float = 0.002      # learning rate dla aproksymatora L2
+    L2_UPDATE_FREQ: int = 3000           # co ile krokow aktualizowac statystyki waznosci
 
     # Bramka meta-warstwy (Krok 4)
     GATE_FEATURES: int = 16              # liczba cech wejsciowych bramki
-    GATE_LEARNING_RATE: float = 0.005    # wyzszy LR — bramka uczy sie szybciej
+    GATE_LEARNING_RATE: float = 0.0055    # wyzszy LR — bramka uczy sie szybciej
     GATE_UPDATE_FREQ: int = 1            # co ile krokow aktualizowac bramke (1 = kazdy)
     GATE_TRAIN_START: int = 1000         # po ilu krokach zaczac uczyc bramke
-    GATE_SOFTMAX_TEMP: float = 1.0       # temperatura softmax (1.0 = normalny)
+    GATE_SOFTMAX_TEMP: float = 1.3       # temperatura softmax (1.0 = normalny)
 
     # Model swiata (Krok 5)
     WORLD_MODEL_FEATURES: int = 32         # liczba cech dla modelu swiata
@@ -182,16 +182,16 @@ class SwarmConfig:
     WORLD_MODEL_UPDATE_FREQ: int = 10      # co ile krokow aktualizowac model swiata
     WORLD_MODEL_BATCH_SIZE: int = 64       # batch do treningu modelu swiata
     WORLD_MODEL_BUFFER_SIZE: int = 10000   # bufor doswiadczen modelu swiata
-    COUNTERFACTUAL_STEPS: int = 3          # nieuzywane aktywnie w krok. 5, zostawiamy jako koncepcje
-    COUNTERFACTUAL_THRESHOLD: float = 0.5  # prog poprawy, by dodac kontrfaktyke
+    COUNTERFACTUAL_STEPS: int = 6          # nieuzywane aktywnie w krok. 5, zostawiamy jako koncepcje
+    COUNTERFACTUAL_THRESHOLD: float = 0.75  # prog poprawy, by dodac kontrfaktyke
     COUNTERFACTUAL_LR: float = 0.1         # jak bardzo kontrfaktyka wplywa na Q (waga)
-    CONCEPT_PRUNING_INTERVAL: int = 2000  # Co ile krokow uruchamiac przycinanie konceptow
+    CONCEPT_PRUNING_INTERVAL: int = 3000  # Co ile krokow uruchamiac przycinanie konceptow
 
     # Neural Network (Krok 6)
     NN_HIDDEN_1: int = 32               # pierwsza warstwa ukryta (82 -> 32)
     NN_HIDDEN_2: int = 16               # druga warstwa ukryta (32 -> 16)
     NN_ACTIVATION: str = "relu"         # "relu" lub "tanh"
-    NN_LEARNING_RATE: float = 0.000001
+    NN_LEARNING_RATE: float = 0.00001
     NN_USE_L1_INIT: bool = True         # inicjalizuj W1 srednia z L1 (8x82)
     NN_USE_L2_INIT: bool = True         # inicjalizuj W2 srednia z L2 (8x32)
     NN_USE_A_INIT: bool = True          # inicjalizuj glowe A (jesli osobna)
@@ -297,10 +297,10 @@ class ConceptGraph:
         self.learning_buffer: List[Tuple[List[Action], bool]] = []  # (sequence, success)
         
         # Parametry przycinania konceptów
-        self.pruning_interval = 1000          # Co ile kroków uruchamiać przycinanie
-        self.min_usage_to_survive = 5         # Minimalna liczba użyć, by koncept nie został usunięty
-        self.min_success_ratio_to_survive = 0.25  # Minimalny wskaźnik sukcesu
-        self.similarity_threshold = 0.7       # Próg podobieństwa do łączenia konceptów (0-1)
+        self.pruning_interval = 4000          # Co ile kroków uruchamiać przycinanie
+        self.min_usage_to_survive = 10        # Minimalna liczba użyć, by koncept nie został usunięty
+        self.min_success_ratio_to_survive = 0.35  # Minimalny wskaźnik sukcesu
+        self.similarity_threshold = 0.6       # Próg podobieństwa do łączenia konceptów (0-1)
         self.last_pruned_step = 0
         
         # Predefiniowane koncepty (instynkt)
@@ -331,6 +331,7 @@ class ConceptGraph:
             concept.decay(self.config.CONCEPT_DECAY_RATE)
         
         # Czy ostatnie N akcji pasują do jakiegoś konceptu?
+        # Czy ostatnie N akcji pasują do jakiegoś konceptu?
         if len(self.action_history) >= self.config.CONCEPT_MIN_SEQUENCE:
             recent = list(self.action_history)[-self.config.CONCEPT_MIN_SEQUENCE:]
             
@@ -338,19 +339,15 @@ class ConceptGraph:
                 # Sprawdź czy koncept pasuje do ostatnich akcji
                 if len(concept.sequence) <= len(recent):
                     if recent[-len(concept.sequence):] == concept.sequence:
-                        # Pasuje! Aktywuj (aktualizujac tez last_used_step, ale nie mamy go tu bezposrednio w update...
-                        # Trudno, update() powinno przyjmowac current_step jesli chcemy byc precyzyjni.
-                        # Ale Concept.activate() ma domyslne current_step=0.
-                        # Zmienimy to w integracji glownej petli, zeby przekazywac step.
-                        # Na razie uzywamy czasu systemowego w activate().
+                        # Pasuje! Aktywuj z aktualnym krokiem
                         concept.activate(0.1, current_step)
                         
                         # Jeśli reward pozytywny = sukces
                         if reward > 0:
                             concept.mark_success(self.config.CONCEPT_SUCCESS_BOOST)
         
-        # Uczenie się nowych konceptów (jeśli buffer pełny)
-        if reward > 0.5 and len(self.action_history) >= self.config.CONCEPT_MIN_SEQUENCE:
+        # Uczenie się nowych konceptów (jeśli nagroda wysoka)
+        if reward > 0.7 and len(self.action_history) >= self.config.CONCEPT_MIN_SEQUENCE:
             self._try_learn_new_concept()
     
     def _try_learn_new_concept(self):
@@ -581,8 +578,8 @@ class FreeSpaceInstinct:
     def compute_free_space_vector(self, lidar_16: np.ndarray) -> Tuple[float, float]:
         free_space = 1.0 - lidar_16
         angles = np.arange(16) * (2 * np.pi / 16)
-        x_sum = float(np.sum(free_space * np.cos(angles)).item())
-        y_sum = float(np.sum(free_space * np.sin(angles)).item())
+        x_sum = float(np.sum(free_space * np.cos(angles)))
+        y_sum = float(np.sum(free_space * np.sin(angles)))
         magnitude = math.sqrt(x_sum**2 + y_sum**2) / 16.0
         if magnitude < 0.01:
             return 0.0, 0.0
@@ -779,6 +776,37 @@ class AntiStagnationController:
         return pwm_l, pwm_r
 
 
+class StagnationBreaker:
+    """
+    Agresywny mechanizm wyrywania z pętli stagnacji
+    """
+    def __init__(self):
+        self.last_visited = 0
+        self.stuck_counter = 0
+        self.escape_until = 0
+        
+    def update(self, visited: int, lmin: float, step: int) -> Optional[Action]:
+        # Jeśli trwa ucieczka
+        if step < self.escape_until:
+            if step % 5 == 0:  # zmieniaj kierunek co 5 kroków
+                return Action.SPIN_LEFT if random.random() < 0.5 else Action.SPIN_RIGHT
+            return None
+            
+        # Sprawdź czy utknął
+        if visited == self.last_visited and lmin < 0.3:
+            self.stuck_counter += 1
+            if self.stuck_counter > 50:  # 50 kroków bez postępu
+                self.stuck_counter = 0
+                self.escape_until = step + 30  # 30 kroków ucieczki
+                logger.warning(f"⚠️ STAGNATION BREAKER! Wymuszam ucieczkę")
+                return Action.SPIN_LEFT if random.random() < 0.5 else Action.SPIN_RIGHT
+        else:
+            self.stuck_counter = max(0, self.stuck_counter - 2)
+            
+        self.last_visited = visited
+        return None
+
+
 # =============================================================================
 # LIDAR ENGINE (NAPRAWIONY - check front sectors)
 # =============================================================================
@@ -788,7 +816,6 @@ class LidarEngine:
         self.config = config
         self.sectors_16 = np.zeros(16)
         self.min_dist = config.LIDAR_MAX_RANGE
-        self.history = deque(maxlen=3)
     
     def process(self, lidar_points: List[Tuple[float, float]]) -> np.ndarray:
         self.sectors_16.fill(0.0)
@@ -808,12 +835,6 @@ class LidarEngine:
                 self.sectors_16[i] = 1.0 - min(min_d / self.config.LIDAR_MAX_RANGE, 1.0)
             else:
                 self.sectors_16[i] = 0.0
-                
-        self.history.append(self.min_dist)
-        
-        # Median filter
-        if len(self.history) == 3:
-            self.min_dist = sorted(self.history)[1]
         
         return self.sectors_16
     
@@ -1030,10 +1051,10 @@ class FeatureExtractor:
         rear_sec  = lidar_16[6:10]
         left_sec  = lidar_16[10:14]
         
-        mean_front = float(np.mean(front_sec).item())
-        mean_left  = float(np.mean(left_sec).item())
-        mean_right = float(np.mean(right_sec).item())
-        mean_rear  = float(np.mean(rear_sec).item())
+        mean_front = float(np.mean(front_sec))
+        mean_left  = float(np.mean(left_sec))
+        mean_right = float(np.mean(right_sec))
+        mean_rear  = float(np.mean(rear_sec))
         
         # ── 17–22: Agregaty kierunkowe ───────────────────────────────────────
         f.append(mean_front)                          # 17
@@ -1078,21 +1099,20 @@ class FeatureExtractor:
         f.append(us_min * avg_speed)                  # 43
         
         # ── 44–59: Rozszerzone agregaty ─────────────────────────────────────
-        import math
-        f.append(float(math.log(min_dist + 0.01)))    # 44
-        f.append(float(np.var(front_sec).item()))     # 45
+        f.append(float(np.log(min_dist + 0.01)))      # 44
+        f.append(float(np.var(front_sec)))            # 45
         f.append(mean_left - mean_front)              # 46
         f.append(mean_right - mean_front)             # 47
         f.append(mean_rear - mean_front)              # 48
         f.append(min_dist ** 2)                       # 49
         f.append(us_min ** 2)                         # 50
-        front_peak = float(np.max(front_sec).item())
+        front_peak = float(np.max(front_sec))
         f.append(front_peak)                          # 51
-        f.append(float(np.max(left_sec).item()))      # 52
-        f.append(float(np.max(right_sec).item()))     # 53
+        f.append(float(np.max(left_sec)))             # 52
+        f.append(float(np.max(right_sec)))            # 53
         f.append(front_peak - mean_front)             # 54
-        f.append(float(np.max(left_sec).item()) - mean_left) # 55
-        f.append(float(np.max(right_sec).item()) - mean_right) # 56
+        f.append(float(np.max(left_sec)) - mean_left) # 55
+        f.append(float(np.max(right_sec)) - mean_right) # 56
         f.append(1.0 / (us_left + 0.1))               # 57
         f.append(1.0 / (us_right + 0.1))              # 58
         f.append(avg_speed ** 2)                      # 59
@@ -1676,6 +1696,18 @@ class NeuralHybridBrain:
         
         # Gate weights for diagnostics (if gate exists)
         gate_weights = np.zeros(2)
+        
+        # Stagnation Breaker - wymuś ucieczkę jeśli utknął
+        break_action = None
+        if hasattr(self, "spatial_memory") and self.spatial_memory:
+            visited = self.spatial_memory.get_visited_cells()
+            break_action = self.stagnation_breaker.update(
+                visited, 
+                self.lidar.min_dist,
+                self.cycle_count
+            )
+            if break_action:
+                self.stabilizer.force_unlock()
         if hasattr(self.nn, 'W_gate'):
              gate_weights = self.nn.forward_gate()
              
@@ -1915,7 +1947,6 @@ class NeuralHybridBrain:
         # Jesli nie mielismy jeszcze L2, po prostu ustaw
         if not hasattr(self, 'l2_feature_indices') or self.l2_feature_indices is None:
             self.l2_feature_indices = current_indices
-            self.l2_last_change_step = self.step_counter
             self.l2_version += 1
             stats['changes'] = 32
             stats['stability'] = 0.0
@@ -1927,16 +1958,6 @@ class NeuralHybridBrain:
         new_set = set(current_indices)
         
         changes = len(old_set.symmetric_difference(new_set)) // 2  # ile cech sie zmienilo
-        
-        # Stabilnosc L2 - mroz zmiany jesli zbyt czeste
-        if not force:
-            if changes < 10:  # Zwiekszony prog zmian z 2 na 10
-                logger.info(f"L2 stabilna ({changes} zmian) - brak aktualizacji")
-                return False, stats
-            
-            if self.step_counter - getattr(self, "l2_last_change_step", 0) < 5000:
-                logger.warning(f"Zbyt czeste zmiany L2 ({changes} zmian) - blokada stabilnosci")
-                return False, stats
         stats['changes'] = changes
         stats['old_indices'] = self.l2_feature_indices.copy()
         
@@ -1956,7 +1977,6 @@ class NeuralHybridBrain:
         if force or changes >= adaptive_threshold:
             # Zaktualizuj L2
             self.l2_feature_indices = current_indices
-            self.l2_last_change_step = self.step_counter
             self.l2_version += 1
             self.l2_last_reinforce = time.time()
             self.l2_stability_counter = int(stability * 100)
@@ -2097,19 +2117,18 @@ class NeuralHybridBrain:
 
             if 'l2_feature_indices' in data and data['l2_feature_indices'].size > 0:
                 self.l2_feature_indices = data['l2_feature_indices']
-                self.l2_version = int(data['l2_version'].item() if 'l2_version' in data else 0)
-                self.l2_last_reinforce = float(data['l2_last_reinforce'].item() if 'l2_last_reinforce' in data else 0)
-                self.l2_stability_counter = int(data['l2_stability_counter'].item() if 'l2_stability_counter' in data else 0)
-                self.l2_last_change_step = 0  # Krok ostatniej zmiany
+                self.l2_version = int(data.get('l2_version', 0))
+                self.l2_last_reinforce = float(data.get('l2_last_reinforce', 0))
+                self.l2_stability_counter = int(data.get('l2_stability_counter', 0))
                 logger.info(f"ð¥ Wczytano L2 v{self.l2_version}: {len(self.l2_feature_indices)} cech, "
                            f"ostatnie wzmocnienie: {self.l2_last_reinforce}")
             self.top32_indices = data.get('top32_indices')
-            self.step_counter = int(data['step_counter'].item() if 'step_counter' in data else 0)
-            self.counterfactual_count = int(data['counterfactual_count'].item() if 'counterfactual_count' in data else 0)
-            self.lr = float(data['learning_rate'].item() if 'learning_rate' in data else self.config.LEARNING_RATE)
+            self.step_counter = int(data.get('step_counter', 0))
+            self.counterfactual_count = int(data.get('counterfactual_count', 0))
+            self.lr = float(data.get('learning_rate', self.config.LEARNING_RATE))
 
-            version = data['version'].item() if 'version' in data else '?'
-            saved_at = data['saved_at'].item() if 'saved_at' in data else 'nieznana data'
+            version = data.get('version', '?')
+            saved_at = data.get('saved_at', 'nieznana data')
             print(f"Wczytano model v{version}, krok {self.step_counter}, zapis: {saved_at}")
             return True
 
@@ -2209,10 +2228,6 @@ class StateManager:
         self.config = config
         self.brain_path = Path(config.BRAIN_FILE)
         self.save_counter = 0
-
-
-
-
     
     def save(self, data: Dict):
         try:
@@ -2243,10 +2258,6 @@ class StateManager:
         self.save_counter += 1
         if self.save_counter >= self.config.AUTO_SAVE_INTERVAL:
             self.save_counter = 0
-
-
-
-
             return True
         return False
 
@@ -2288,6 +2299,9 @@ class SwarmCoreV55:
         self.stabilizer = ActionStabilizer(self.config)
         self.anti_stagnation = AntiStagnationController(self.config)
         
+        # Stagnation Breaker
+        self.stagnation_breaker = StagnationBreaker()
+        
         # Persistence wbudowana
         self.state_manager = StateManager(self.config)
         self._load_state()
@@ -2295,10 +2309,6 @@ class SwarmCoreV55:
         self.cycle_count = 0
         self.hard_reflex_hold_remaining = 0
         self.hard_reflex_action: Optional[Action] = None
-        
-        # Anti-oscillation history
-        self.oscillation_history = deque(maxlen=100)
-        self.instinct_boost_active = False
         
         # Rear bumper state
         self.rear_bumper_forward_remaining = 0
@@ -2413,9 +2423,9 @@ class SwarmCoreV55:
                     # I przód i tył zablokowane → spin w stronę wyższego US
                     if us_left_dist >= us_right_dist:
                         self.hard_reflex_action = Action.SPIN_LEFT
-    
+                    else:
                         self.hard_reflex_action = Action.SPIN_RIGHT
-
+                else:
                     self.hard_reflex_action = Action.REVERSE
             self.hard_reflex_hold_remaining = self.config.HARD_REFLEX_HOLD_CYCLES
             return self.hard_reflex_action, "LIDAR_HARD_SAFETY"
@@ -2457,7 +2467,7 @@ class SwarmCoreV55:
                 self.rear_bumper_forward_remaining = 0
                 if us_left_dist >= us_right_dist:
                     spin_action = Action.SPIN_LEFT
-
+                else:
                     spin_action = Action.SPIN_RIGHT
                 self.hard_reflex_action = spin_action
                 self.hard_reflex_hold_remaining = self.config.HARD_REFLEX_HOLD_CYCLES
@@ -2545,10 +2555,6 @@ class SwarmCoreV55:
                                        lidar_16[0],  lidar_16[1]]))
         front_clearance = 1.0 - front_occ   # odwroc: 1=wolno, 0=sciana
         
-        if getattr(self, "instinct_boost_active", False):
-            # Boost instinct if oscillation active
-            for k in instinct_bias:
-                instinct_bias[k] *= 2.0
         instinct_bias = self.instinct.get_bias_for_action(
             free_angle,
             magnitude=free_mag,
@@ -2584,9 +2590,24 @@ class SwarmCoreV55:
         collision = (us_front_min < dyn_us) or (self.lidar.min_dist < dyn_lidar)
         
         gate_weights = np.zeros(2)
+        
+        # Stagnation Breaker - wymuś ucieczkę jeśli utknął
+        break_action = None
+        if hasattr(self, "spatial_memory") and self.spatial_memory:
+            visited = self.spatial_memory.get_visited_cells()
+            break_action = self.stagnation_breaker.update(
+                visited, 
+                self.lidar.min_dist,
+                self.cycle_count
+            )
+            if break_action:
+                self.stabilizer.force_unlock()
 
         if safety_override:
             final_action, source = safety_override
+        elif break_action:
+            final_action = break_action
+            source = "STAGNATION_BREAKER"
         else:
             # ★ NOWE: Anti-stagnation moze wymusic skret
             forced_turn = self.anti_stagnation.should_force_turn()
@@ -2643,18 +2664,7 @@ class SwarmCoreV55:
         # 9. Q-Update
         #    Uczenie ZAWSZE (nawet na wymuszonych akcjach):
         if self.brain.last_features is not None and self.brain.last_action is not None:
-            self.oscillation_history.append(1 if source == "ANTI_OSCILLATION" else 0)
-            if sum(self.oscillation_history) > 3:
-                self.instinct_boost_active = True
-            else:
-                self.instinct_boost_active = False
             oscillated = (
-
- 
-
-
-
-            
                 source == "ANTI_OSCILLATION"
                 or self._action_repeat_count >= self.config.OSCILLATION_MAX_REPEATS
             )
@@ -2708,7 +2718,13 @@ class SwarmCoreV55:
         #     FORWARD dostaje mikro-szum dopiero na poziomie PWM (krok 19b)
         if final_action in (Action.TURN_LEFT, Action.TURN_RIGHT,
                             Action.SPIN_LEFT, Action.SPIN_RIGHT):
-            bias_strength = self.config.LORENZ_BIAS_SCALE
+            # Wzmocnij Lorenza jeśli robot stoi w miejscu
+            if self.anti_stagnation.is_stagnant:
+                lorenz_boost = 5.0  # 5x silniejszy!
+            else:
+                lorenz_boost = 1.0
+                
+            bias_strength = self.config.LORENZ_BIAS_SCALE * lorenz_boost
             target_l += directional_bias * bias_strength
             target_r -= directional_bias * bias_strength
         
@@ -2781,10 +2797,10 @@ class SwarmCoreV55:
         
         # 22. Pelna diagnostyka co 50 cykli
         if self.cycle_count % 50 == 0:
-            chaos_mode = "STAG_FORCE" if getattr(self.anti_stagnation, 'stagnation_force_remaining', 0) > 0 else ("STAGNANT" if self.anti_stagnation.is_stagnant else "NORMAL")
-            chaos_info = f"Chaos={chaos_mode} (Lx={directional_bias:+.2f} Lz={aggression_factor:.2f})"
-            free_info  = (f"front_clr={front_clearance:.2f} "
+            lorenz_info = f"Lx={directional_bias:+.2f} Lz={aggression_factor:.2f}"
+            free_info   = (f"front_clr={front_clearance:.2f} "
                            f"free_ang={math.degrees(free_angle):+.0f}deg mag={free_mag:.2f}")
+            stag_info   = "STAGNANT!" if self.anti_stagnation.is_stagnant else "ok"
             q_vals      = self.brain.nn.cache.get('q', np.zeros(8))
             q_info      = (f"Q=[{np.min(q_vals):+.2f},{np.max(q_vals):+.2f}] "
                            f"Qnrm={np.linalg.norm(q_vals):.1f} "
@@ -2810,7 +2826,7 @@ class SwarmCoreV55:
                 f"USL={us_left_dist:.2f} USR={us_right_dist:.2f} "
                 f"Lmin={self.lidar.min_dist:.2f} "
                 f"act={final_action.name} src={source} "
-                f"{chaos_info} {free_info} "
+                f"{lorenz_info} {free_info} stag={stag_info} "
                 f"{q_info} {gate_info} {wm_info}"
             )
         
