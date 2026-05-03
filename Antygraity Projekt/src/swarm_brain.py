@@ -128,11 +128,11 @@ class SwarmBrain:
 
             for w in words:
                 if w not in blacklist_vec:
-                    vec = semantic_engine.encode(w)
-                    if w not in self.vector_db:
-                        self.vector_db[w] = {'vector': vec, 'count': 1}
-                    else:
+                    if w in self.vector_db:
                         self.vector_db[w]['count'] += 1
+                    else:
+                        vec = semantic_engine.encode(w)
+                        self.vector_db[w] = {'vector': vec, 'count': 1}
 
         # Blacklist for NER (Named Entity Recognition)
         blacklist = ['jest', 'to', 'się', 'ja', 'ty', 'co', 'dzisiaj', 'robimy',
