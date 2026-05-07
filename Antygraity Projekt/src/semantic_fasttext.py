@@ -1,4 +1,3 @@
-```
 import os
 import numpy as np
 
@@ -82,4 +81,3 @@ class FastTextEngine:
 
     def get_dimension(self):
         return self.target_dim
-```
