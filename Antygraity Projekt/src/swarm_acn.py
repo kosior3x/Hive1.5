@@ -1,4 +1,3 @@
-
 import numpy as np
 import random
 import time
@@ -94,17 +93,9 @@ def acn_tick(agents):
     if len(agents) < 2: return
     sender, receiver = random.sample(agents, 2)
 
-    # 2. Select Active Dimensions in Sender
-    # Only send info about things the sender is "Thinking" about (Activity > Threshold)
-    # If nothing active, maybe send a random spark (spontaneous firing)
-    active_indices = np.where(sender.activity > 0.4)[0]
-
-    if len(active_indices) == 0:
-        # Spontaneous low-level firing
-        active_indices = np.random.choice(len(sender.stm), 1)
-
-    stimulus = sender.stm.copy() # We send the whole vector, but receiver handles specific dims?
-    # Actually, simpler to send whole, receiver mask? Let's send full for simpler Numpy
+    # 2. Transmit Stimulus
+    # We send the full STM vector. The receiver will handle processing.
+    stimulus = sender.stm.copy()
 
     # 3. Generate Chaos Energy
     # sender uses its internal lorenz state
